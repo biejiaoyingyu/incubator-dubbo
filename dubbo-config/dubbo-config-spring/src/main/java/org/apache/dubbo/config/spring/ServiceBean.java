@@ -124,21 +124,28 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
         return supportedApplicationListener && (delay == null || delay == -1);
     }
 
+    /**
+     * 在Spring实例化这个bean后会调用接口方法afterPropertiesSet
+     * @throws Exception
+     */
     @Override
     @SuppressWarnings({"unchecked", "deprecation"})
     public void afterPropertiesSet() throws Exception {
+        //如果没有配置provider
         if (getProvider() == null) {
+            //获取IOC容器里的所有provider
             Map<String, ProviderConfig> providerConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ProviderConfig.class, false, false);
             if (providerConfigMap != null && providerConfigMap.size() > 0) {
                 Map<String, ProtocolConfig> protocolConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ProtocolConfig.class, false, false);
                 if ((protocolConfigMap == null || protocolConfigMap.size() == 0)
-                        && providerConfigMap.size() > 1) { // backward compatibility
+                        && providerConfigMap.size() > 1) { // backward compatibility // 兼容旧版本
                     List<ProviderConfig> providerConfigs = new ArrayList<ProviderConfig>();
                     for (ProviderConfig config : providerConfigMap.values()) {
                         if (config.isDefault() != null && config.isDefault()) {
                             providerConfigs.add(config);
                         }
                     }
+                    //关联所有providers
                     if (!providerConfigs.isEmpty()) {
                         setProviders(providerConfigs);
                     }
@@ -158,8 +165,10 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
                 }
             }
         }
+        //如果没有配置application，且没有配置provider
         if (getApplication() == null
                 && (getProvider() == null || getProvider().getApplication() == null)) {
+            //获取所有applications
             Map<String, ApplicationConfig> applicationConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ApplicationConfig.class, false, false);
             if (applicationConfigMap != null && applicationConfigMap.size() > 0) {
                 ApplicationConfig applicationConfig = null;
@@ -171,11 +180,13 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
                         applicationConfig = config;
                     }
                 }
+                //关联application
                 if (applicationConfig != null) {
                     setApplication(applicationConfig);
                 }
             }
         }
+        //如果没有配置module，且没有配置provider
         if (getModule() == null
                 && (getProvider() == null || getProvider().getModule() == null)) {
             Map<String, ModuleConfig> moduleConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ModuleConfig.class, false, false);
@@ -189,11 +200,13 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
                         moduleConfig = config;
                     }
                 }
+                //关联module
                 if (moduleConfig != null) {
                     setModule(moduleConfig);
                 }
             }
         }
+        //如果没有配置registries，且没有配置provider
         if ((getRegistries() == null || getRegistries().isEmpty())
                 && (getProvider() == null || getProvider().getRegistries() == null || getProvider().getRegistries().isEmpty())
                 && (getApplication() == null || getApplication().getRegistries() == null || getApplication().getRegistries().isEmpty())) {
@@ -205,11 +218,13 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
                         registryConfigs.add(config);
                     }
                 }
+                //关联registries
                 if (!registryConfigs.isEmpty()) {
                     super.setRegistries(registryConfigs);
                 }
             }
         }
+        //如果没有配置monitor，且没有配置provider
         if (getMonitor() == null
                 && (getProvider() == null || getProvider().getMonitor() == null)
                 && (getApplication() == null || getApplication().getMonitor() == null)) {
@@ -224,11 +239,13 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
                         monitorConfig = config;
                     }
                 }
+                //关联monitor
                 if (monitorConfig != null) {
                     setMonitor(monitorConfig);
                 }
             }
         }
+        //如果没有配置protocol，且没有配置provider
         if ((getProtocols() == null || getProtocols().isEmpty())
                 && (getProvider() == null || getProvider().getProtocols() == null || getProvider().getProtocols().isEmpty())) {
             Map<String, ProtocolConfig> protocolConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ProtocolConfig.class, false, false);
@@ -239,11 +256,13 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
                         protocolConfigs.add(config);
                     }
                 }
+                //关联protocol
                 if (!protocolConfigs.isEmpty()) {
                     super.setProtocols(protocolConfigs);
                 }
             }
         }
+        //如果没有配置path
         if (getPath() == null || getPath().length() == 0) {
             if (beanName != null && beanName.length() > 0
                     && getInterface() != null && getInterface().length() > 0
@@ -251,6 +270,7 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
                 setPath(beanName);
             }
         }
+        //暴露provider
         if (!isDelay()) {
             export();
         }

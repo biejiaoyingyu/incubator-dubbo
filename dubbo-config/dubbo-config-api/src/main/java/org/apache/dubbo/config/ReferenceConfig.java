@@ -184,31 +184,46 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         ref = null;
     }
 
+    /**
+     *
+     *   这步其实是Reference确认生成Invoker所需要的组件是否已经准备好，
+     *   都准备好后我们进入生成Invoker的部分。这里的getObject会调用父类
+     *   ReferenceConfig的init方法完成组装：
+     */
     private void init() {
+        //避免重复初始化
         if (initialized) {
             return;
         }
+        //置为已经初始化
         initialized = true;
+        //如果interfaceName不存在
         if (interfaceName == null || interfaceName.length() == 0) {
             throw new IllegalStateException("<dubbo:reference interface=\"\" /> interface not allow null!");
         }
         // get consumer's global configuration
+        // 获取消费者
         checkDefault();
         appendProperties(this);
+        //如果未使用泛接口并且consumer已经准备好的情况下，reference使用和consumer一样的泛接口
         if (getGeneric() == null && getConsumer() != null) {
             setGeneric(getConsumer().getGeneric());
         }
+        //如果是泛接口那么interface的类型是GenericService
         if (ProtocolUtils.isGeneric(getGeneric())) {
             interfaceClass = GenericService.class;
         } else {
+            //如果不是泛接口使用interfaceName指定的泛接口
             try {
                 interfaceClass = Class.forName(interfaceName, true, Thread.currentThread()
                         .getContextClassLoader());
             } catch (ClassNotFoundException e) {
                 throw new IllegalStateException(e.getMessage(), e);
             }
+            //检查接口以及接口中的方法都是否配置齐全
             checkInterfaceAndMethods(interfaceClass, methods);
         }
+        //如果服务比较多可以指定dubbo-resolve.properties文件配置service（service集中配置文件）
         String resolve = System.getProperty(interfaceName);
         String resolveFile = null;
         if (resolve == null || resolve.length() == 0) {
@@ -247,6 +262,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 }
             }
         }
+        //如果application、module、registries、monitor未配置则使用consumer的
         if (consumer != null) {
             if (application == null) {
                 application = consumer.getApplication();
@@ -261,6 +277,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 monitor = consumer.getMonitor();
             }
         }
+        //如果module已关联则关联module的registries和monitor
         if (module != null) {
             if (registries == null) {
                 registries = module.getRegistries();
@@ -269,6 +286,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 monitor = module.getMonitor();
             }
         }
+        //如果application已关联则关联application的registries和monitor
         if (application != null) {
             if (registries == null) {
                 registries = application.getRegistries();
@@ -277,10 +295,13 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 monitor = application.getMonitor();
             }
         }
+        //检查application
         checkApplication();
+        //检查远端和本地服务接口真实存在（是否可load）
         checkStubAndMock(interfaceClass);
         Map<String, String> map = new HashMap<String, String>();
         resolveAsyncInterface(interfaceClass, map);
+        //配置dubbo的端属性（是consumer还是provider）、版本属性、创建时间、进程号
         Map<Object, Object> attributes = new HashMap<Object, Object>();
         map.put(Constants.SIDE_KEY, Constants.CONSUMER_SIDE);
         map.put(Constants.DUBBO_VERSION_KEY, Version.getProtocolVersion());
@@ -303,6 +324,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
             }
         }
         map.put(Constants.INTERFACE_KEY, interfaceName);
+        //调用application、module、consumer的get方法将属性设置到map中
         appendParameters(map, application);
         appendParameters(map, module);
         appendParameters(map, consumer, Constants.DEFAULT_KEY);
@@ -332,7 +354,9 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         map.put(Constants.REGISTER_IP_KEY, hostToRegistry);
 
         //attributes are stored by system context.
+        //attributes通过系统context进行存储.
         StaticContext.getSystemContext().putAll(attributes);
+        //在map装载了application、module、consumer、reference的所有属性信息后创建代理
         ref = createProxy(map);
         ConsumerModel consumerModel = new ConsumerModel(getUniqueServiceName(), this, ref, interfaceClass.getMethods());
         ApplicationModel.initConsumerModel(getUniqueServiceName(), consumerModel);
@@ -343,9 +367,10 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         URL tmpUrl = new URL("temp", "localhost", 0, map);
         final boolean isJvmRefer;
         if (isInjvm() == null) {
-            if (url != null && url.length() > 0) { // if a url is specified, don't do local reference
+            if (url != null && url.length() > 0) { // if a url is specified, don't do local reference//指定URL的情况下，不做本地引用
                 isJvmRefer = false;
             } else {
+                //默认情况下如果本地有服务暴露，则引用本地服务.
                 // by default, reference local service if there is
                 isJvmRefer = InjvmProtocol.getInjvmProtocol().isInjvmRefer(tmpUrl);
             }
@@ -361,6 +386,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
             }
         } else {
             if (url != null && url.length() > 0) { // user specified URL, could be peer-to-peer address, or register center's address.
+                // 用户指定URL，指定的URL可能是对点对直连地址，也可能是注册中心URL
                 String[] us = Constants.SEMICOLON_SPLIT_PATTERN.split(url);
                 if (us != null && us.length > 0) {
                     for (String u : us) {
@@ -376,6 +402,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                     }
                 }
             } else { // assemble URL from register center's configuration
+                // 通过注册中心配置拼装URL
                 List<URL> us = loadRegistries(false);
                 if (us != null && !us.isEmpty()) {
                     for (URL u : us) {
@@ -392,21 +419,25 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
             }
 
             if (urls.size() == 1) {
+                //此处举例说明如果是Dubbo协议则调用DubboProtocol的refer方法生成invoker，当用户调用service接口实际调用的是invoker的invoke方法
                 invoker = refprotocol.refer(interfaceClass, urls.get(0));
             } else {
+                //多个service生成多个invoker
                 List<Invoker<?>> invokers = new ArrayList<Invoker<?>>();
                 URL registryURL = null;
                 for (URL url : urls) {
                     invokers.add(refprotocol.refer(interfaceClass, url));
                     if (Constants.REGISTRY_PROTOCOL.equals(url.getProtocol())) {
+                        // 用了最后一个registry url
                         registryURL = url; // use last registry url
                     }
                 }
-                if (registryURL != null) { // registry url is available
+                if (registryURL != null) { // registry url is available// 有 注册中心协议的URL
                     // use AvailableCluster only when register's cluster is available
                     URL u = registryURL.addParameter(Constants.CLUSTER_KEY, AvailableCluster.NAME);
                     invoker = cluster.join(new StaticDirectory(u, invokers));
                 } else { // not a registry url
+                   // 不是注册中心的URL
                     invoker = cluster.join(new StaticDirectory(invokers));
                 }
             }
@@ -428,7 +459,14 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
             logger.info("Refer dubbo service " + interfaceClass.getName() + " from url " + invoker.getUrl());
         }
         // create service proxy
+        // 创建服务代理
         return (T) proxyFactory.getProxy(invoker);
+        /**
+         * 至此Reference在关联了所有application、module、consumer、registry、monitor、service、protocol
+         * 后调用对应Protocol类的refer方法生成InvokerProxy。
+         * 当用户调用service时dubbo会通过InvokerProxy调用
+         * Invoker的invoke的方法向服务端发起请求。客户端就这样完成了自己的初始化。
+         */
     }
 
     private void checkDefault() {
