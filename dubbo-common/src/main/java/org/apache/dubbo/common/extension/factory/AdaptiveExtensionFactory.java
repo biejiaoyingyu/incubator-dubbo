@@ -26,6 +26,16 @@ import java.util.List;
 
 /**
  * AdaptiveExtensionFactory
+ * 它跟Compiler接口一样设配类注解@Adaptive是打在类AdaptiveExtensionFactory上的不
+ * 是通过 javassist 编译生成的
+ *
+ * AdaptiveExtensionFactory 持有所有 ExtensionFactory 对象的集合，dubbo 内部默认实现
+ * 的对象工厂是 SpiExtensionFactory 和 SpringExtensionFactory，他们经过 TreeMap 排好序的查
+ * 找顺序是优先先从 SpiExtensionFactory 获取，如果返回空在从 SpringExtensionFactory 获取。
+ * 这里我们可以看如下两个文件：
+ * /dubbo-common/src/main/resources/META-INF/dubbo/internal/com.alibaba.dubbo.common.extension.ExtensionFactory
+ * /dubbo-config-spring/src/main/resources/META-INF/dubbo/internal/com.alibaba.dubbo.common.extension.ExtensionFactory
+ *
  */
 @Adaptive
 public class AdaptiveExtensionFactory implements ExtensionFactory {
@@ -44,6 +54,10 @@ public class AdaptiveExtensionFactory implements ExtensionFactory {
     @Override
     public <T> T getExtension(Class<T> type, String name) {
         for (ExtensionFactory factory : factories) {
+            /**
+             * 从这里我们看出，ObjectFactory. getExtension(Class<T> type, String name)是先从
+             * SpiExtensionFactory 获得扩展点，再从 SpringExtensionFactory 获得扩展点
+             */
             T extension = factory.getExtension(type, name);
             if (extension != null) {
                 return extension;

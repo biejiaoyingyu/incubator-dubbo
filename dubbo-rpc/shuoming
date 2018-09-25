@@ -1,2 +1,5 @@
 dubbo-rpc 远程调用模块，抽象各种协议，以及动态代理，只包含一对一的调用，
 不关心集群的管理,依赖--------------->remoting模块
+
+https://yq.aliyun.com/articles/272405
+链接：https://pan.baidu.com/s/1pNkNucV 密码：4ium

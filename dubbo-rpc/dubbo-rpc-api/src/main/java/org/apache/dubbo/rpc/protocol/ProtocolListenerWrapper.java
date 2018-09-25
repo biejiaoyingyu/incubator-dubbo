@@ -32,6 +32,14 @@ import java.util.Collections;
 
 /**
  * ListenerProtocol
+ * 在这里我们可以看到 export 和 refer 分别对应了不同的 Wrapper；
+ * 经过debug，发现ExporterListener并没有实现类，同时通过 ebug也会发现
+ * ListenerExporterWrapper 在执行过程中确实 listeners 变量是空的
+ *
+ * 而对于 ListenerInvokerWrapper ， 我 们 发 现 在 如 下 文 件 中 ：
+ * dubbo-rpc-api/src/main/resources/META-INF/dubbo/internal/com.alibaba.dubbo.rpc.InvokerListener
+ * deprecated=com.alibaba.dubbo.rpc.listener.DeprecatedInvokerListener
+ * public class DeprecatedInvokerListener extends InvokerListenerAdapter
  */
 public class ProtocolListenerWrapper implements Protocol {
 

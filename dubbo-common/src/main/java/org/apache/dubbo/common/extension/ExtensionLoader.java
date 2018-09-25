@@ -94,6 +94,15 @@ public class ExtensionLoader<T> {
 
     private Map<String, IllegalStateException> exceptions = new ConcurrentHashMap<String, IllegalStateException>();
 
+    /**
+     * 这里我们看到 getExtensionLoader 会是一个死循环，因为会不断调用；但是实际上在
+     * getAdaptiveExtension 中会直接返回被 Adaptive 注解的类，因此避免了死循环；
+     *
+     * 在 getExtensionClasses 函数中，在读取文件加载类的过程过程中，会判断该类是否带
+     * 有 Adaptive 注解，如果是，则直接赋值
+     *
+     * @param type
+     */
     private ExtensionLoader(Class<?> type) {
         this.type = type;
         objectFactory = (type == ExtensionFactory.class ? null : ExtensionLoader.getExtensionLoader(ExtensionFactory.class).getAdaptiveExtension());
@@ -704,6 +713,12 @@ public class ExtensionLoader<T> {
                     type + ", class line: " + clazz.getName() + "), class "
                     + clazz.getName() + "is not subtype of interface.");
         }
+
+        /**
+         * 在 getExtensionClasses 函数中，在读取文件加载类的过程过程中，会判断该类是否带
+         * 有 Adaptive 注解，如果是，则直接赋值
+         * 这里同时可以确认，对于一个 spi 接口，有且只有一个类带有 adaptive 注解，否则会出错；
+         */
         if (clazz.isAnnotationPresent(Adaptive.class)) {
             if (cachedAdaptiveClass == null) {
                 cachedAdaptiveClass = clazz;

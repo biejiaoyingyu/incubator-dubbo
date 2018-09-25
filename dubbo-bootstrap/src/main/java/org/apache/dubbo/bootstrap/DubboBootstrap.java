@@ -66,7 +66,6 @@ public class DubboBootstrap {
         serviceConfigList.add(serviceConfig);
         return this;
     }
-
     public void start() {
         if (registerShutdownHookOnStart) {
             registerShutdownHook();

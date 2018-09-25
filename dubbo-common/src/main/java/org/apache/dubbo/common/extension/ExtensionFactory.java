@@ -18,6 +18,7 @@ package org.apache.dubbo.common.extension;
 
 /**
  * ExtensionFactory
+ * ExtensionFactory 就是根据类型和名字来获取对象
  */
 @SPI
 public interface ExtensionFactory {

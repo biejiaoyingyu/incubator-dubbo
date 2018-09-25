@@ -23,6 +23,8 @@ import org.apache.dubbo.common.extension.SPI;
 
 /**
  * ProxyFactory. (API/SPI, Singleton, ThreadSafe)
+ * return (T) proxyFactory.getProxy(invoker);
+ * private static final ProxyFactory proxyFactory =ExtensionLoader.getExtensionLoader(ProxyFactory.class).getAdaptiveExtension();
  */
 @SPI("javassist")
 public interface ProxyFactory {
