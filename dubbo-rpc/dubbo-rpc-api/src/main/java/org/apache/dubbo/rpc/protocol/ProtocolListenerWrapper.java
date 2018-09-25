@@ -31,6 +31,11 @@ import org.apache.dubbo.rpc.listener.ListenerInvokerWrapper;
 import java.util.Collections;
 
 /**
+ * 一个支持监听器特性的Protocal的包装器。支持两种监听器的功能扩展，分
+ * 别是：ExporterListener是远程服务发布监听器，可以监听服务发布和取消
+ * 发布两个事件点；InvokerListener是服务消费者引用调用器的监听器，可以
+ * 监听引用和销毁两个事件方法。
+ * -------------------------------------------------------------
  * ListenerProtocol
  * 在这里我们可以看到 export 和 refer 分别对应了不同的 Wrapper；
  * 经过debug，发现ExporterListener并没有实现类，同时通过 ebug也会发现
@@ -59,9 +64,11 @@ public class ProtocolListenerWrapper implements Protocol {
 
     @Override
     public <T> Exporter<T> export(Invoker<T> invoker) throws RpcException {
+        //特殊协议，跳过监听器触发
         if (Constants.REGISTRY_PROTOCOL.equals(invoker.getUrl().getProtocol())) {
             return protocol.export(invoker);
         }
+        //调用原始协议的发布方法，触发监听器链事件。
         return new ListenerExporterWrapper<T>(protocol.export(invoker),
                 Collections.unmodifiableList(ExtensionLoader.getExtensionLoader(ExporterListener.class)
                         .getActivateExtension(invoker.getUrl(), Constants.EXPORTER_LISTENER_KEY)));

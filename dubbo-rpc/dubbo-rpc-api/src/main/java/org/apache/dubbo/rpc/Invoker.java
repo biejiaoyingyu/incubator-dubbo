@@ -20,7 +20,8 @@ import org.apache.dubbo.common.Node;
 
 /**
  * Invoker. (API/SPI, Prototype, ThreadSafe)
- *
+ * 该接口是服务的执行体。它有获取服务发布的URL，服务的接口类等关键属性的行为；还有核心的服务执行方法invoke，
+ * 执行该方法后返回执行结果Result，而传递的参数是调用信息Invocation。该接口有大量的抽象和具体实现类。
  * @see org.apache.dubbo.rpc.Protocol#refer(Class, org.apache.dubbo.common.URL)
  * @see org.apache.dubbo.rpc.InvokerListener
  * @see org.apache.dubbo.rpc.protocol.AbstractInvoker

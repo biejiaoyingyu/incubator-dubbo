@@ -31,7 +31,7 @@ public interface ProxyFactory {
 
     /**
      * create proxy.
-     *
+     * 根据invoker目标接口的代理对象，一般是消费者获得代理对象触发远程调用
      * @param invoker
      * @return proxy
      */
@@ -49,7 +49,7 @@ public interface ProxyFactory {
 
     /**
      * create invoker.
-     *
+     * 方法将代理对象proxy、接口类type和远程服务的URL获取执行对象Invoker，往往是提供者获得目标执行对象执行目标实现调用
      * @param <T>
      * @param proxy
      * @param type

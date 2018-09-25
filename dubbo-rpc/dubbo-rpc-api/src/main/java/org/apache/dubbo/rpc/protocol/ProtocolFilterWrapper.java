@@ -30,6 +30,10 @@ import org.apache.dubbo.rpc.RpcException;
 import java.util.List;
 
 /**
+ * 是一个Protocol的支持过滤器的装饰器
+ * 通过该装饰器的对原始对象的包装使得Protocol支持可扩展的过滤器链，已经支持的包括
+ * ExceptionFilter、ExecuteLimitFilter和TimeoutFilter等多种支持不同特性的过滤器
+ * --------------------------------------------------------------------
  * 这个地方非常重要，dubbo 机制里面日志记录、超时等等功能都是在这一部分实现的。
  * 这个类有 3 个特点，第一它有一个参数为 Protocol protocol 的构造函数；第二，它
  * 实现了 Protocol 接口；第三，它使用职责链模式，对 export 和 refer 函数进行了封装
@@ -63,9 +67,11 @@ public class ProtocolFilterWrapper implements Protocol {
      */
     private static <T> Invoker<T> buildInvokerChain(final Invoker<T> invoker, String key, String group) {
         Invoker<T> last = invoker;
+        //通过该句获得扩展配置的过滤器列表，具体机制需要研究该类的实现
         List<Filter> filters = ExtensionLoader.getExtensionLoader(Filter.class).getActivateExtension(invoker.getUrl(), key, group);
         if (!filters.isEmpty()) {
             for (int i = filters.size() - 1; i >= 0; i--) {
+                //循环将过滤器列表组装成为过滤器链，目标invoker是最后一个执行的。
                 final Filter filter = filters.get(i);
                 final Invoker<T> next = last;
                 last = new Invoker<T>() {

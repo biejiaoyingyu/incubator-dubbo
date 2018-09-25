@@ -32,11 +32,15 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * AbstractProxyProtocol
+ * 继承自AbstractProtoco的一个抽象代理协议类。它聚合了代理工厂ProxyFactory对象来实现服务的暴露和引用
  */
 public abstract class AbstractProxyProtocol extends AbstractProtocol {
 
     private final List<Class<?>> rpcExceptions = new CopyOnWriteArrayList<Class<?>>();
 
+    /**
+     * 聚合代理工厂
+     */
     private ProxyFactory proxyFactory;
 
     public AbstractProxyProtocol() {
@@ -63,12 +67,17 @@ public abstract class AbstractProxyProtocol extends AbstractProtocol {
     @Override
     @SuppressWarnings("unchecked")
     public <T> Exporter<T> export(final Invoker<T> invoker) throws RpcException {
+        //获得Url对应的serviceKey值
         final String uri = serviceKey(invoker.getUrl());
+        //根据url获取对应的exporter
         Exporter<T> exporter = (Exporter<T>) exporterMap.get(uri);
+        //如果已经存在，则直接返回，实现接口支持幂等调用。该处难道无须考虑线程安全问题吗？(ConcurrentHashMap是线程安全的)
         if (exporter != null) {
             return exporter;
         }
+        //执行抽放方法暴露服务。runnable方法的行为有什么约束没有？该处不明确。
         final Runnable runnable = doExport(proxyFactory.getProxy(invoker, true), invoker.getInterface(), invoker.getUrl());
+        //调用proxyFactory.getProxy(invoker)来获得invoker的代理对象。
         exporter = new AbstractExporter<T>(invoker) {
             @Override
             public void unexport() {
@@ -83,12 +92,14 @@ public abstract class AbstractProxyProtocol extends AbstractProtocol {
                 }
             }
         };
+        //保存
         exporterMap.put(uri, exporter);
         return exporter;
     }
 
     @Override
     public <T> Invoker<T> refer(final Class<T> type, final URL url) throws RpcException {
+        //先调用doRefer获得服务服务对象，再调用proxyFactory.getInvoker获得invoker对象
         final Invoker<T> target = proxyFactory.getInvoker(doRefer(type, url), type, url);
         Invoker<T> invoker = new AbstractInvoker<T>(type, url) {
             @Override
@@ -137,8 +148,15 @@ public abstract class AbstractProxyProtocol extends AbstractProtocol {
         return RpcException.UNKNOWN_EXCEPTION;
     }
 
+
+    /**
+     * 留给子类实现的真正将类发布到URL上的抽象方法定义，由具体的协议来实现。
+     */
     protected abstract <T> Runnable doExport(T impl, Class<T> type, URL url) throws RpcException;
 
+    /**
+     * 留给子类实现的引用远程服务的抽象方法定义，该方法是将URL和type接口类应用到一个可以远程调用代理对象。
+     */
     protected abstract <T> T doRefer(Class<T> type, URL url) throws RpcException;
 
 }

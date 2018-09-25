@@ -38,7 +38,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * AbstractInvoker.
+ * AbstractInvoker.是通用的抽象实现
  */
 public abstract class AbstractInvoker<T> implements Invoker<T> {
 

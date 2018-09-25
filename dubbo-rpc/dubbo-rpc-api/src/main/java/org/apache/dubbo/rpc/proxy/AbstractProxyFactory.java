@@ -27,6 +27,7 @@ import org.apache.dubbo.rpc.service.GenericService;
 
 /**
  * AbstractProxyFactory
+ * 提供了getProxy的模版方法实现，使得可以支持多接口的映射
  */
 public abstract class AbstractProxyFactory implements ProxyFactory {
 

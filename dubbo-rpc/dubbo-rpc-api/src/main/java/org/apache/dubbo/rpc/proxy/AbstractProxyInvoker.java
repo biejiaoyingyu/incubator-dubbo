@@ -33,6 +33,7 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * InvokerWrapper
+ * 是基于代理的执行器抽象实现
  */
 public abstract class AbstractProxyInvoker<T> implements Invoker<T> {
     Logger logger = LoggerFactory.getLogger(AbstractProxyInvoker.class);
