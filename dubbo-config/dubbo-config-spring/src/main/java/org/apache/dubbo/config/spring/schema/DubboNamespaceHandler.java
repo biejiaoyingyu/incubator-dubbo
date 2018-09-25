@@ -39,6 +39,25 @@ import org.springframework.beans.factory.xml.NamespaceHandlerSupport;
  *
  * 注册解析器
  * 当spring解析xml配置文件时就会调用这些解析器生成对应的BeanDefinition交给spring管理
+ *
+ * 在很多情况下，我们需要为系统提供可配置化支持，简单的做法可以直接基于 Spring
+ * 的标准 Bean 来配置，但配置较为复杂或者需要更多丰富控制的时候，会显得非常笨拙。一
+ * 般的做法会用原生态的方式去解析定义好的 xml 文件，然后转化为配置对象，这种方式当然
+ * 可以解决所有问题，但实现起来比较繁琐，特别是是在配置非常复杂的时候，解析工作是一
+ * 个不得不考虑的负担。Spring 提供了可扩展 Schema 的支持，这是一个不错的折中方案，完
+ * 成一个自定义配置一般需要以下步骤：
+ *  设计配置属性和 JavaBean
+ *  编写 XSD 文件(需要去深入了解一下)
+ *  编写 NamespaceHandler 和 BeanDefinitionParser 完成解析工作
+ *  编写 spring.handlers 和 spring.schemas 串联起所有部件
+ *  在 Bean 文件中应用
+ *
+ * 下面需要完成解析xsd工作，会用到 NamespaceHandler 和 BeanDefinitionParser 这两个概念。
+ * 具体说来 NamespaceHandler 会根据 schema 和节点名找到某个 BeanDefinitionParser，然后由
+ * BeanDefinitionParser 完成具体的解析工作。因此需要分别完成 NamespaceHandler 和
+ * BeanDefinitionParser 的实现类，Spring 提供了默认实现类 NamespaceHandlerSupport 和
+ * AbstractSingleBeanDefinitionParser，简单的方式就是去继承这两个类
+ *
  * @export
  */
 public class DubboNamespaceHandler extends NamespaceHandlerSupport {
@@ -47,6 +66,9 @@ public class DubboNamespaceHandler extends NamespaceHandlerSupport {
         Version.checkDuplicate(DubboNamespaceHandler.class);
     }
 
+    /**
+     * 也就是将之定义的xsd文件中的配置文件转化成为相应的类
+     */
     @Override
     public void init() {
         //配置<dubbo:application>标签解析器

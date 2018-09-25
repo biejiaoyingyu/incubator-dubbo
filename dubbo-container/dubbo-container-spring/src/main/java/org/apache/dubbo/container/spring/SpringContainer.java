@@ -38,6 +38,9 @@ public class SpringContainer implements Container {
         return context;
     }
 
+    /**
+     * 启动springioc容器
+     */
     @Override
     public void start() {
         String configPath = ConfigUtils.getProperty(SPRING_CONFIG);

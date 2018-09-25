@@ -301,6 +301,17 @@ public class ExtensionLoader<T> {
     /**
      * Find the extension with the given name. If the specified name is not found, then {@link IllegalStateException}
      * will be thrown.
+     *
+     *  返回指定名字的扩展。如果指定名字的扩展不存在，则抛异常 {@link IllegalStateException}
+     *
+     *  @Adaptive 注解：该注解打在接口方法上；调 ExtensionLoader.getAdaptiveExtension()获
+     * 取设配类，会先通过前面的过程生成 java 的源代码，在通过编译器编译成 class 加载。
+     * 但是 Compiler 的实现策略选择也是通过 ExtensionLoader.getAdaptiveExtension()，如果也
+     * 通过编译器编译成 class 文件那岂不是要死循环下去了吗？
+     * 此时分析 ExtensionLoader.getAdaptiveExtension()函数，对于有实现类上去打了注解
+     * @Adaptive 的 dubbo spi 扩展机制，它获取设配类不在通过前面过程生成设配类 java 源代码，
+     * 而是在读取扩展文件的时候遇到实现类打了注解@Adaptive 就把这个类作为设配类缓存在
+     * ExtensionLoader 中，调用是直接返回
      */
     @SuppressWarnings("unchecked")
     public T getExtension(String name) {
@@ -446,6 +457,9 @@ public class ExtensionLoader<T> {
     }
 
     @SuppressWarnings("unchecked")
+    /**
+     * 获得spi扩展点的实例？？
+     */
     public T getAdaptiveExtension() {
         Object instance = cachedAdaptiveInstance.get();
         if (instance == null) {
@@ -496,6 +510,9 @@ public class ExtensionLoader<T> {
     }
 
     @SuppressWarnings("unchecked")
+    /**
+     *
+     */
     private T createExtension(String name) {
         Class<?> clazz = getExtensionClasses().get(name);
         if (clazz == null) {
@@ -508,6 +525,15 @@ public class ExtensionLoader<T> {
                 instance = (T) EXTENSION_INSTANCES.get(clazz);
             }
             injectExtension(instance);
+            /**
+             * 下面這一段很重要
+             * 此时可以发现这里对 instance 加了装饰类；对于 Protocol 来说加了两个装饰类
+             * ProtocolFilterWrapper 和 ProtocolListenerWrapper；
+             * 也就/injectExtension 实例化包装类，并注入接口的适配器， 注意这个地方返回的是最后一
+             * 个包装类
+             * 在生成 Protocol 的 invoker 时，实际上使用了
+             * 装饰模式，第一个是 filter，第二个是 listener；
+             */
             Set<Class<?>> wrapperClasses = cachedWrapperClasses;
             if (wrapperClasses != null && !wrapperClasses.isEmpty()) {
                 for (Class<?> wrapperClass : wrapperClasses) {
@@ -521,6 +547,12 @@ public class ExtensionLoader<T> {
         }
     }
 
+    /**
+     * 而这里 injectExtension 类，则是为生成的 instance 注入变量；
+     * 其目标是搜索所有 set 开头，同时只有一个入参的函数，执行该函数，对变量进行注入；
+     * @param instance
+     * @return
+     */
     private T injectExtension(T instance) {
         try {
             if (objectFactory != null) {
@@ -655,6 +687,17 @@ public class ExtensionLoader<T> {
         }
     }
 
+
+    /**
+     * 分析：这里实际上是如果该类带有 Adaptive 注解，则认为是 cachedAdaptiveClass；若该
+     * 类没有 Adaptive 注解，则判断该类是否带有参数是 type 类型的构造函数，若有，则认为是
+     * wrapper 类
+     * @param extensionClasses
+     * @param resourceURL
+     * @param clazz
+     * @param name
+     * @throws NoSuchMethodException
+     */
     private void loadClass(Map<String, Class<?>> extensionClasses, java.net.URL resourceURL, Class<?> clazz, String name) throws NoSuchMethodException {
         if (!type.isAssignableFrom(clazz)) {
             throw new IllegalStateException("Error when load extension class(interface: " +
@@ -734,6 +777,9 @@ public class ExtensionLoader<T> {
     }
 
     @SuppressWarnings("unchecked")
+    /**
+     * 创建spi的实例
+     */
     private T createAdaptiveExtension() {
         try {
             return injectExtension((T) getAdaptiveExtensionClass().newInstance());
@@ -742,6 +788,12 @@ public class ExtensionLoader<T> {
         }
     }
 
+    /**
+     * 而 cachedAdaptiveInstance 类则是若有 cachedAdaptiveClass 对象，则直接返回，否则通过生成类文件，然后 complier 出来
+     *
+     * 只有标注了@Adaptive 注释的函数会在运行时动态的决定扩展点实现
+     * @return
+     */
     private Class<?> getAdaptiveExtensionClass() {
         getExtensionClasses();
         if (cachedAdaptiveClass != null) {

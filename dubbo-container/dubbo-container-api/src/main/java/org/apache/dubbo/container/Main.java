@@ -47,6 +47,10 @@ public class Main {
 
     private static final Condition STOP = LOCK.newCondition();
 
+    /**
+     * 这里有main方法
+     * @param args
+     */
     public static void main(String[] args) {
         try {
             if (args == null || args.length == 0) {

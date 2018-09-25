@@ -30,6 +30,10 @@ import org.apache.dubbo.rpc.RpcException;
 import java.util.List;
 
 /**
+ * 这个地方非常重要，dubbo 机制里面日志记录、超时等等功能都是在这一部分实现的。
+ * 这个类有 3 个特点，第一它有一个参数为 Protocol protocol 的构造函数；第二，它
+ * 实现了 Protocol 接口；第三，它使用职责链模式，对 export 和 refer 函数进行了封装
+ * 对于函数封装，有点类似于 tomcat 的 filter 机制
  * ListenerProtocol
  */
 public class ProtocolFilterWrapper implements Protocol {
@@ -43,6 +47,20 @@ public class ProtocolFilterWrapper implements Protocol {
         this.protocol = protocol;
     }
 
+    /**
+     *它读取所有的 filter 类，利用这些类封装 invoker
+     * /dubbo-rpc-api/src/main/resources/META-INF/dubbo/internal/com.alibaba.dubbo.rpc.Filter
+     * 这其中涉及到很多功能，包括权限验证、异常、超时等等，当然可以预计计算调用时间等
+     * 等应该也是在这其中的某个类实现的；
+     * 这里我们可以看到 export 和 refer 过程都会被 filter 过滤，那么如果记录接口调用时
+     * 间时，服务器端部分只是记录接口在服务器端的执行时间，而客户端部分会记录接口在服务器端
+     * 的执行时间+网络传输时间。
+     * @param invoker
+     * @param key
+     * @param group
+     * @param <T>
+     * @return
+     */
     private static <T> Invoker<T> buildInvokerChain(final Invoker<T> invoker, String key, String group) {
         Invoker<T> last = invoker;
         List<Filter> filters = ExtensionLoader.getExtensionLoader(Filter.class).getActivateExtension(invoker.getUrl(), key, group);

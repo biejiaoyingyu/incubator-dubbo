@@ -105,6 +105,25 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
         return service;
     }
 
+
+    /**
+     * export 过程（暴露服务）是在如下过程触发
+     * onApplicationEvent 函数应该是系统调用的；
+     * org.springframework.context.support.AbstractApplicationContext 类中如下函数
+     * public void publishEvent(ApplicationEvent event) {
+     *      Assert.notNull(event, "Event must not be null");
+     *      if (logger.isTraceEnabled()) {
+     *      logger.trace("Publishing event in context [" + getId() + "]:
+     *      " + event);
+     * }
+     *      getApplicationEventMulticaster().multicastEvent(event);
+     *      if (this.parent != null) {
+     *      this.parent.publishEvent(event);
+     *  }
+     *  }
+     *  实际上以上函数是springioc调用如下函数的 finishRefresh 中调用的
+     * @param event
+     */
     @Override
     public void onApplicationEvent(ContextRefreshedEvent event) {
         if (isDelay() && !isExported() && !isUnexported()) {
