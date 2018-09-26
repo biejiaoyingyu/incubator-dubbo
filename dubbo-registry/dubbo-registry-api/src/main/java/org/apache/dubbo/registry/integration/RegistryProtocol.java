@@ -198,7 +198,13 @@ public class RegistryProtocol implements Protocol {
             synchronized (bounds) {
                 exporter = (ExporterChangeableWrapper<T>) bounds.get(key);
                 if (exporter == null) {
+                    /**
+                     * 如果服务提供者以dubbo协议暴露服务，getProviderUrl(originInvoker)返回的URL将以dubbo://开头。
+                     */
                     final Invoker<?> invokerDelegete = new InvokerDelegete<T>(originInvoker, getProviderUrl(originInvoker));
+                    /**
+                     * 根据Dubbo内置的SPI机制，将调用DubboProtocol#export方法。
+                     */
                     exporter = new ExporterChangeableWrapper<T>((Exporter<T>) protocol.export(invokerDelegete), originInvoker);
                     bounds.put(key, exporter);
                 }

@@ -77,11 +77,15 @@ public abstract class AbstractServer extends AbstractEndpoint implements Server 
 
     protected abstract void doClose() throws Throwable;
 
+
     @Override
     public void reset(URL url) {
         if (url == null) {
             return;
         }
+        /**
+         * 首先是调整线程池的相关线程数量，这个好理解
+         */
         try {
             if (url.hasParameter(Constants.ACCEPTS_KEY)) {
                 int a = url.getParameter(Constants.ACCEPTS_KEY, 0);
@@ -126,6 +130,11 @@ public abstract class AbstractServer extends AbstractEndpoint implements Server 
         } catch (Throwable t) {
             logger.error(t.getMessage(), t);
         }
+        /**
+         * 然后设置调用setUrl覆盖原先NettyServer的private volatile URL url的属性，
+         * 那为什么不会影响原先注册的dubbo:server呢？
+         * 原来NettyHandler上加了注解：@Sharable，由该注解去实现线程安全
+         */
         super.setUrl(getUrl().addParameters(url.getParameters()));
     }
 

@@ -59,6 +59,10 @@ public class Exchangers {
         return bind(URL.valueOf(url), handler);
     }
 
+    /**
+     * 首先根据url获取Exchanger实例，然后调用bind方法构建ExchangeServer
+     *  服务提供者调用
+     */
     public static ExchangeServer bind(URL url, ExchangeHandler handler) throws RemotingException {
         if (url == null) {
             throw new IllegalArgumentException("url == null");
@@ -69,6 +73,7 @@ public class Exchangers {
         url = url.addParameterIfAbsent(Constants.CODEC_KEY, "exchange");
         return getExchanger(url).bind(url, handler);
     }
+
 
     public static ExchangeClient connect(String url) throws RemotingException {
         return connect(URL.valueOf(url));
@@ -98,6 +103,9 @@ public class Exchangers {
         return connect(URL.valueOf(url), handler);
     }
 
+    /**
+     * 服务消费者调用。
+     */
     public static ExchangeClient connect(URL url, ExchangeHandler handler) throws RemotingException {
         if (url == null) {
             throw new IllegalArgumentException("url == null");
