@@ -39,12 +39,18 @@ public abstract class AbstractProxyFactory implements ProxyFactory {
     @Override
     public <T> T getProxy(Invoker<T> invoker, boolean generic) throws RpcException {
         Class<?>[] interfaces = null;
+        /**
+         * 从消费者URL中获取interfaces的值，用,分隔出单个服务应用接口。
+         */
         String config = invoker.getUrl().getParameter(Constants.INTERFACES);
         if (config != null && config.length() > 0) {
             String[] types = Constants.COMMA_SPLIT_PATTERN.split(config);
             if (types != null && types.length > 0) {
                 interfaces = new Class<?>[types.length + 2];
                 interfaces[0] = invoker.getInterface();
+                /**
+                 * 增加默认接口EchoService接口。
+                 */
                 interfaces[1] = EchoService.class;
                 for (int i = 0; i < types.length; i++) {
                     // TODO can we load successfully for a different classloader?.
@@ -63,7 +69,9 @@ public abstract class AbstractProxyFactory implements ProxyFactory {
             System.arraycopy(temp, 0, interfaces, 0, len);
             interfaces[len] = com.alibaba.dubbo.rpc.service.GenericService.class;
         }
-
+        /**
+         * 根据需要实现的接口，使用jdk或Javassist创建代理类。
+         */
         return getProxy(invoker, interfaces);
     }
 
