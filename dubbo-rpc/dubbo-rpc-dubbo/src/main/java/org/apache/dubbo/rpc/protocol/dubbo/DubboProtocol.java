@@ -58,6 +58,7 @@ import java.util.concurrent.ConcurrentMap;
 
 /**
  * dubbo protocol support.
+ * 该类是抽象协议实现类AbstractProtocol的具体的dubbo协议的实现，从该类开始着手分析。
  */
 public class DubboProtocol extends AbstractProtocol {
 
@@ -240,16 +241,24 @@ public class DubboProtocol extends AbstractProtocol {
         return DEFAULT_PORT;
     }
 
+    /**
+     * 该方法实现了dubbo协议的服务发布，显示构造一个DubboExporter实现类的Exporter，用于返回。最核心的是调用
+     * 内部方法openServer(url);将该url发布到dubbo服务器上。
+     */
     @Override
     public <T> Exporter<T> export(Invoker<T> invoker) throws RpcException {
         URL url = invoker.getUrl();
 
         // export service.
+        // export service. 通过url获得该服务的key。格式如：{serviceGroup}/{serviceName}:{serviceVersion}:{port}
         String key = serviceKey(url);
+        //Dubbo协议实现的服务发布器。
         DubboExporter<T> exporter = new DubboExporter<T>(invoker, key, exporterMap);
+
         exporterMap.put(key, exporter);
 
         //export an stub service for dispatching event
+        //参数STUB_EVENT_KEY和IS_CALLBACK_SERVICE的含义不太清楚，需要后续深究。
         Boolean isStubSupportEvent = url.getParameter(Constants.STUB_EVENT_KEY, Constants.DEFAULT_STUB_EVENT);
         Boolean isCallbackservice = url.getParameter(Constants.IS_CALLBACK_SERVICE, false);
         if (isStubSupportEvent && !isCallbackservice) {
@@ -263,16 +272,22 @@ public class DubboProtocol extends AbstractProtocol {
                 stubServiceMethodsMap.put(url.getServiceKey(), stubServiceMethods);
             }
         }
-
+        //调用打开服务器绑定url的方法，这个地方是核心，需要进入深究。
         openServer(url);
         optimizeSerialization(url);
         return exporter;
     }
 
+    /**
+     * 该方法是获得url的地址，通过地址找到对应的server，若已经有相同的地址则无需构造新的server，只需要直接使
+     * 用，只就起到了缓存server的作用，避免重复构建server。若已经找到了该地址，则会调用server.reset(url)重置一
+     * 下。url中的参数Constants.IS_SERVER_KEY参数可以禁止发布远程服务，只能本地调用。具体意义不是十分清楚。
+     */
     private void openServer(URL url) {
         // find server.
         String key = url.getAddress();
         //client can export a service which's only for server to invoke
+        //client 也可以暴露一个只有server可以调用的服务。
         boolean isServer = url.getParameter(Constants.IS_SERVER_KEY, true);
         if (isServer) {
             ExchangeServer server = serverMap.get(key);
@@ -285,6 +300,7 @@ public class DubboProtocol extends AbstractProtocol {
                 }
             } else {
                 // server supports reset, use together with override
+                //server支持reset,配合override功能使用
                 server.reset(url);
             }
         }
@@ -292,8 +308,10 @@ public class DubboProtocol extends AbstractProtocol {
 
     private ExchangeServer createServer(URL url) {
         // send readonly event when server closes, it's enabled by default
+        //默认开启server关闭时发送readonly事件
         url = url.addParameterIfAbsent(Constants.CHANNEL_READONLYEVENT_SENT_KEY, Boolean.TRUE.toString());
         // enable heartbeat by default
+        //默认开启heartbeat
         url = url.addParameterIfAbsent(Constants.HEARTBEAT_KEY, String.valueOf(Constants.DEFAULT_HEARTBEAT));
         String str = url.getParameter(Constants.SERVER_KEY, Constants.DEFAULT_REMOTING_SERVER);
 
