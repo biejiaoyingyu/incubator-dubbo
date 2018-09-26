@@ -205,10 +205,16 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
             }
         }
         //如果不需要暴露接口则直接返回
+        /**
+         * 判断是否暴露服务，由dubbo:service export=”true|false”来指定。
+         */
         if (export != null && !export) {
             return;
         }
         //如果延迟暴露的时间（毫秒级）是存在的，开启线程并等待delay毫秒后开始暴露接口，否则直接执行暴露接口过程
+        /**
+         * 如果启用了delay机制，如果delay大于0，表示延迟多少毫秒后暴露服务，使用ScheduledExecutorService延迟调度，最终调用doExport方法
+         */
         if (delay != null && delay > 0) {
             delayExportExecutor.schedule(new Runnable() {
                 @Override
@@ -217,6 +223,9 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                 }
             }, delay, TimeUnit.MILLISECONDS);
         } else {
+            /**
+             * 执行具体的暴露逻辑doExport，留意：delay=-1的处理逻辑（基于Spring事件机制触发）
+             */
             doExport();
         }
     }
@@ -270,6 +279,9 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                 monitor = application.getMonitor();
             }
         }
+        /**
+         * 校验ref与interface属性。如果ref是GenericService，则为dubbo的泛化实现，然后验证interface接口与ref引用的类型是否一致。
+         */
         if (ref instanceof GenericService) {
             interfaceClass = GenericService.class;
             if (StringUtils.isEmpty(generic)) {
@@ -287,6 +299,9 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
             generic = Boolean.FALSE.toString();
         }
         //如果是本地服务
+        /**
+         * dubbo:service local机制，已经废弃，被stub属性所替换。
+         */
         if (local != null) {
             if ("true".equals(local)) {
                 //如果是本地服务在interfaceName属性后面加上Local
@@ -304,6 +319,9 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
             }
         }
         //如果是远程服务
+        /**
+         * 处理本地存根Stub
+         */
         if (stub != null) {
             if ("true".equals(stub)) {
                 stub = interfaceName + "Stub";
@@ -319,6 +337,15 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                 throw new IllegalStateException("The stub implementation class " + stubClass.getName() + " not implement interface " + interfaceName);
             }
         }
+
+        /**
+         * 校验ServiceBean的application、registry、protocol是否为空，并从系统属性（优先）、资源文件中填充其属性。
+         * 系统属性、资源文件属性的配置如下：
+         * application       dubbo.application.属性名，例如    dubbo.application.name
+         * registry          dubbo.registry.属性名，例如    dubbo.registry.address
+         * protocol          dubbo.protocol.属性名，例如 dubbo.protocol.port
+         * service           dubbo.service.属性名，例如 dubbo.service.stub
+         */
         //检查application
         checkApplication();
         //检查registries
@@ -332,7 +359,13 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
             path = interfaceName;
         }
         //暴露地址
+        /**
+         * 执行doExportUrls()方法暴露服务，接下来会重点分析该方法。
+         */
         doExportUrls();
+        /**
+         * 将服务提供者信息注册到ApplicationModel实例中。
+         */
         ProviderModel providerModel = new ProviderModel(getUniqueServiceName(), this, ref);
         ApplicationModel.initProviderModel(getUniqueServiceName(), providerModel);
     }
@@ -370,9 +403,23 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
+    /**
+     * 先遍历ServiceBean的List registries（所有注册中心的配置信息），然后将地址封装成URL对象，
+     * 关于注册中心的所有配置属性，最终转换成url的属性(?属性名=属性值)，一个注册中心URL示例：
+     * registry://127.0.0.1:2181/com.alibaba.dubbo.registry.RegistryService?application=demo-provider&dubbo=2.0.0&pid=7072&qos.port=22222&registry=zookeeper&timestamp=1527308268041
+     */
     private void doExportUrls() {
         //将注册的所有url匹配上对应的协议在服务端暴露出来
+        /**
+         * loadRegistries(true)，
+         * 参数的意思：true，代表服务提供者，false：代表服务消费者，如果是服务提供者，则检测注册中心
+         * 的配置，如果配置了register=”false”，则忽略该地址，如果是服务消费者，并配置了subscribe=”false”
+         * 则表示不从该注册中心订阅服务，故也不返回
+         */
         List<URL> registryURLs = loadRegistries(true);
+        /**
+         * 然后遍历配置的所有协议，根据每个协议，向注册中心暴露服务，接下来重点分析doExportUrlsFor1Protocol方法的实现细节。
+         */
         for (ProtocolConfig protocolConfig : protocols) {
             doExportUrlsFor1Protocol(protocolConfig, registryURLs);
         }
@@ -385,6 +432,11 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
             name = "dubbo";
         }
         //获取application、module、provider、protocol、exporter、registries、monitor所有属性
+        /**
+         * 用Map存储该协议的所有配置参数，包括协议名称、dubbo版本、当前系统时间戳、进程ID、
+         * application配置、module配置、默认服务提供者参数(ProviderConfig)、协议配置、
+         * 服务提供Dubbo:service的属性。
+         */
         Map<String, String> map = new HashMap<String, String>();
         map.put(Constants.SIDE_KEY, Constants.PROVIDER_SIDE);
         map.put(Constants.DUBBO_VERSION_KEY, Version.getProtocolVersion());
@@ -397,6 +449,10 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         appendParameters(map, provider, Constants.DEFAULT_KEY);
         appendParameters(map, protocolConfig);
         appendParameters(map, this);
+        /**
+         * 如果dubbo:service有dubbo:method子标签，则dubbo:method以及其子标签的配置属性，
+         * 都存入到Map中，属性名称加上对应的方法名作为前缀。dubbo:method的子标签dubbo:argument,其键为方法名.参数序号。
+         */
         if (methods != null && !methods.isEmpty()) {
             for (MethodConfig method : methods) {
                 appendParameters(map, method, method.getName());
@@ -458,6 +514,9 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
             } // end of methods for
         }
 
+        /**
+         * 添加methods键值对，存放dubbo:service的所有方法名，多个方法名用,隔开，如果是泛化实现，填充genric=true,methods为”*”；
+         */
         if (ProtocolUtils.isGeneric(generic)) {
             map.put(Constants.GENERIC_KEY, generic);
             map.put(Constants.METHODS_KEY, Constants.ANY_VALUE);
@@ -475,6 +534,9 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                 map.put(Constants.METHODS_KEY, StringUtils.join(new HashSet<String>(Arrays.asList(methods)), ","));
             }
         }
+        /**
+         * 根据是否开启令牌机制，如果开启，设置token键，值为静态值或uuid。
+         */
         if (!ConfigUtils.isEmpty(token)) {
             if (ConfigUtils.isDefault(token)) {
                 map.put(Constants.TOKEN_KEY, UUID.randomUUID().toString());
@@ -482,21 +544,70 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                 map.put(Constants.TOKEN_KEY, token);
             }
         }
+
+        /**
+         * 如果协议为本地协议(injvm)，则设置protocolConfig#register属性为false，表示不向注册中心注册服务，
+         * 在map中存储键为notify,值为false,表示当注册中心监听到服务提供者发送变化（服务提供者增加、服务提供者
+         * 减少等事件时不通知。
+         */
         if (Constants.LOCAL_PROTOCOL.equals(protocolConfig.getName())) {
             protocolConfig.setRegister(false);
             map.put("notify", "false");
         }
         // export service
         // 导出服务
+        /**
+         * 设置协议的contextPath,如果未配置，默认为/interfacename
+         */
         String contextPath = protocolConfig.getContextpath();
         if ((contextPath == null || contextPath.length() == 0) && provider != null) {
             contextPath = provider.getContextpath();
         }
+        /**
+         * 解析服务提供者的IP地址与端口。
+         * 服务IP地址解析顺序：（序号越小越优先）
+         * 1)系统环境变量，变量名：DUBBO_DUBBO_IP_TO_BIND
+         * 2)系统属性,变量名：DUBBO_DUBBO_IP_TO_BIND
+         * 3)系统环境变量，变量名：DUBBO_IP_TO_BIND
+         * 4)系统属性，变量名：DUBBO_IP_TO_BIND
+         * 5)dubbo:protocol 标签的host属性  –> dubbo:provider 标签的host属性
+         * 6)默认网卡IP地址，通过InetAddress.getLocalHost().getHostAddress()获取，如果IP地址不符合要求，继续下一个匹配。
+         * 判断IP地址是否符合要求的标准是：
+         */
         //获取主机地址
         String host = this.findConfigedHosts(protocolConfig, registryURLs, map);
         //获取协议接口号
+        /**
+         *  服务提供者端口解析顺序：（序号越小越优先）
+         * 1)系统环境变量，变量名：DUBBO_DUBBO_PORT_TO_BIND
+         * 2)系统属性，变量名：DUBBO_DUBBO_PORT_TO_BIND
+         * 3)系统环境变量，变量名：DUBBO_PORT_TO_BIND
+         * 4)系统属性，变量名DUBBO_PORT_TO_BIND
+         * 5)dubbo:protocol标签port属性、dubbo:provider标签的port属性。
+         * 6)随机选择一个端口。
+         */
         Integer port = this.findConfigedPorts(protocolConfig, name, map);
         //创建服务所在url
+        /**
+         * 根据协议名称、协议host、协议端口、contextPath、相关配置属性（application、module、
+         * provider、protocolConfig、service及其子标签）构建服务提供者URI。
+         *
+         * -----------------------------------------------------------------------
+         * 以dubbo协议为例，展示最终服务提供者的URL信息如下：
+         * dubbo://192.168.56.1:20880/com.alibaba.dubbo.demo.DemoService?
+         * anyhost=true&
+         * application=demo-provider&
+         * bind.ip=192.168.56.1&
+         * bind.port=20880&
+         * dubbo=2.0.0&
+         * generic=false&
+         * interface=com.alibaba.dubbo.demo.DemoService&
+         * methods=sayHello&
+         * pid=5916&
+         * qos.port=22222&
+         * side=provider&
+         * timestamp=1527168070857
+         */
         URL url = new URL(name, host, port, (contextPath == null || contextPath.length() == 0 ? "" : contextPath + "/") + path, map);
 
         if (ExtensionLoader.getExtensionLoader(ConfiguratorFactory.class)
@@ -505,26 +616,52 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                     .getExtension(url.getProtocol()).getConfigurator(url).configure(url);
         }
 
+        /**
+         *
+         * 接口暴露实现逻辑
+         * 获取dubbo:service标签的scope属性，其可选值为none(不暴露)、local(本地)、remote(远程)，如果配置为none，则不暴露。默认为local。
+         */
         String scope = url.getParameter(Constants.SCOPE_KEY);
         // don't export when none is configured
         //配置为none不暴露
+        /**
+         * 根据scope来暴露服务，如果scope不配置，则默认本地与远程都会暴露，如果配置成local或remote，那就只能是二选一。
+         */
         if (!Constants.SCOPE_NONE.equalsIgnoreCase(scope)) {
-
             // export to local if the config is not remote (export to remote only when config is remote)
             //配置不是remote的情况下做本地暴露 (配置为remote，则表示只暴露远程服务)
+            /**
+             * 如果scope不为remote，则先在本地暴露(injvm):，具体暴露服务的具体实现，将在remote 模式中详细分析
+             */
             if (!Constants.SCOPE_REMOTE.equalsIgnoreCase(scope)) {
                 //暴露的地址是localhost所以远端无法访问
                 exportLocal(url);
             }
             // export to remote if the config is not local (export to local only when config is local)
             //如果配置不是local则暴露为远程服务.(配置为local，则表示只暴露远程服务)
+            /**
+             * 如果scope不为local,则将服务暴露在远程。
+             */
             if (!Constants.SCOPE_LOCAL.equalsIgnoreCase(scope)) {
                 if (logger.isInfoEnabled()) {
                     logger.info("Export dubbo service " + interfaceClass.getName() + " to url " + url);
                 }
+                /**
+                 * remote方式，检测当前配置的所有注册中心，如果注册中心不为空，则遍历注册中心，将服务依次在不同的注册中心进行注册
+                 */
                 if (registryURLs != null && !registryURLs.isEmpty()) {
                     for (URL registryURL : registryURLs) {
+                        /**
+                         * 如果dubbo:service的dynamic属性未配置，尝试取dubbo:registry的dynamic属性，该属性的作用是否启用动态注册，如果设置为false，
+                         * 服务注册后，其状态显示为disable，需要人工启用，当服务不可用时，也不会自动移除，同样需要人工处理，此属性不要在生产环境上配置。
+                         */
                         url = url.addParameterIfAbsent(Constants.DYNAMIC_KEY, registryURL.getParameter(Constants.DYNAMIC_KEY));
+                        /**
+                         *  根据注册中心url(注册中心url)，构建监控中心的URL，如果监控中心URL不为空，则在服务提供者URL上追加monitor，其值为监控中心url(已编码)。
+                         *  1）如果dubbo spring xml配置文件中没有配置监控中心(dubbo:monitor),如果从系统属性-Ddubbo.monitor.address，-Ddubbo.monitor.protocol构建MonitorConfig对象，
+                         *  否则从dubbo的properties配置文件中寻找这个两个参数，如果没有配置，则返回null。
+                         *  2）如果有配置，则追加相关参数，dubbo:monitor标签只有两个属性：address、protocol，其次会追加interface(MonitorService)、协议等。
+                         */
                         URL monitorUrl = loadMonitor(registryURL);
                         if (monitorUrl != null) {
                             url = url.addParameterAndEncoded(Constants.MONITOR_KEY, monitorUrl.toFullString());
@@ -540,7 +677,36 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                             registryURL = registryURL.addParameter(Constants.PROXY_KEY, proxy);
                         }
                         //获取invoker
+                        /**
+                         * 通过动态代理机制创建Invoker，dubbo的远程调用实现类。
+                         */
                         Invoker<?> invoker = proxyFactory.getInvoker(ref, (Class) interfaceClass, registryURL.addParameterAndEncoded(Constants.EXPORT_KEY, url.toFullString()));
+                        /**
+                         * Dubbo远程调用器如何构建，这里不详细深入，重点关注WrapperInvoker的url为:
+                         * registry://127.0.0.1:2181/com.alibaba.dubbo.registry.RegistryService?
+                         * application=demo-provider&
+                         * dubbo=2.0.0&
+                         * export=dubbo%3A%2F%2F192.168.56.1%3A20880%2Fcom.alibaba.dubbo.demo.DemoService%3Fanyhost%3Dtrue%26application%3Ddemo-provider%26bind.ip%3D192.168.56.1%26bind.port%3D20880%26dubbo%3D2.0.0%26generic%3Dfalse%26interface%3Dcom.alibaba.dubbo.demo.DemoService%26methods%3DsayHello%26pid%3D6328%26qos.port%3D22222%26side%3Dprovider%26timestamp%3D1527255510215&
+                         * pid=6328&
+                         * qos.port=22222&
+                         * registry=zookeeper&
+                         * timestamp=152725551020
+                         *
+                         * -------------------------------------
+                         * 1）path属性：com.alibaba.dubbo.registry.RegistryService，注册中心也类似于服务提供者。
+                         * 2）export属性：值为服务提供者的URL，为什么需要关注这个URL呢？
+                         * 请看代码@7，protocol属性为Protocol$Adaptive，Dubbo在加载组件实现类时采用SPI
+                         * (插件机制，有关于插件机制，在该专题后续文章将重点分析)，在这里我们只需要知道，根据URL冒号之前的协议名将会调用相应的方法。
+                         *
+                         * ----------------------------------------------
+                         * 其映射关系(列出与服务启动相关协议实现类)：
+                         * dubbo=com.alibaba.dubbo.rpc.protocol.dubbo.DubboProtocol
+                         * //文件位于dubbo-rpc-dubbo/src/main/resources/META-INF/dubbo/internal/com.alibaba.dubbo.rpc.Protocol
+                         * registry=com.alibaba.dubbo.registry.integration.RegistryProtocol
+                         * //文件位于dubbo-registry-api/src/main/resources/META-INF/dubbo/internal/com.alibaba.dubbo.rpc.Protocol
+                         * 代码@7：根据代码@6的分析，将调用RegistryProtocol#export方法。
+                         */
+
                         DelegateProviderMetaDataInvoker wrapperInvoker = new DelegateProviderMetaDataInvoker(invoker, this);
                         //根据协议将invoker暴露成exporter，具体过程是创建一个ExchangeServer，它会绑定一个ServerSocket到配置端口
                         Exporter<?> exporter = protocol.export(wrapperInvoker);
@@ -591,6 +757,9 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
     private String findConfigedHosts(ProtocolConfig protocolConfig, List<URL> registryURLs, Map<String, String> map) {
         boolean anyhost = false;
         String hostToBind = getValueFromConfig(protocolConfig, Constants.DUBBO_IP_TO_BIND);
+        /**
+         * 判断ip是否符合标准
+         */
         if (hostToBind != null && hostToBind.length() > 0 && isInvalidLocalHost(hostToBind)) {
             throw new IllegalArgumentException("Specified invalid bind ip from property:" + Constants.DUBBO_IP_TO_BIND + ", value:" + hostToBind);
         }
@@ -617,6 +786,9 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                             }
                             try {
                                 //创建socket，连接到注册中心
+                                /**
+                                 * 选择第一个可用网卡，其实现方式是建立socket，连接注册中心，获取socket的IP地址。其代码：
+                                 */
                                 Socket socket = new Socket();
                                 try {
                                     SocketAddress addr = new InetSocketAddress(registryURL.getHost(), registryURL.getPort());
@@ -732,6 +904,11 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         return port;
     }
 
+    /**
+     * 如果dubbo:service标签也就是ServiceBean的provider属性为空，调用appendProperties方法，填充默认属性，其具体加载顺序：
+     * 1）从系统属性加载对应参数值，参数键：dubbo.provider.属性名，System.getProperty。
+     * 2）加载属性配置文件的值。属性配置文件，可通过系统属性：dubbo.properties.file，如果该值未配置，则默认取dubbo.properties属性配置文件。
+     */
     private void checkDefault() {
         if (provider == null) {
             provider = new ProviderConfig();
