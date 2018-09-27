@@ -42,6 +42,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * ExchangeServerImpl
+ * 基于协议头的服务端交互机
  */
 public class HeaderExchangeServer implements ExchangeServer {
 

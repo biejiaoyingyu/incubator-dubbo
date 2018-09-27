@@ -23,6 +23,10 @@ import org.apache.dubbo.remoting.buffer.ChannelBuffer;
 
 import java.io.IOException;
 
+/**
+ *
+ * 定义编解码对应的接口。
+ */
 @SPI
 public interface Codec2 {
 

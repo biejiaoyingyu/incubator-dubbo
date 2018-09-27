@@ -27,6 +27,7 @@ import java.util.Collection;
  * <a href="http://en.wikipedia.org/wiki/Client%E2%80%93server_model">Client/Server</a>
  *
  * @see org.apache.dubbo.remoting.Transporter#bind(org.apache.dubbo.common.URL, ChannelHandler)
+ * 服务端根接口
  */
 public interface Server extends Endpoint, Resetable {
 

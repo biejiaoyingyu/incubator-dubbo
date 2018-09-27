@@ -18,6 +18,9 @@
 package com.alibaba.dubbo.remoting;
 
 @Deprecated
+/**
+ * 客户端通道描述接口
+ */
 public interface Channel extends org.apache.dubbo.remoting.Channel {
 
     com.alibaba.dubbo.common.URL getUrl();

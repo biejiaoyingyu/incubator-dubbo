@@ -28,6 +28,8 @@ import org.apache.dubbo.common.extension.SPI;
  * <a href="http://en.wikipedia.org/wiki/Client%E2%80%93server_model">Client/Server</a>
  *
  * @see org.apache.dubbo.remoting.Transporters
+ *
+ * 定义根据URL创建服务端或客户端，内部实现就是构建Server,Client对象。
  */
 @SPI("netty")
 public interface Transporter {

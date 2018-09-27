@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <li>start server and bind port</li>
  * <li>close server</li>
  * </ul>
+ *
  */
 public class Server {
 
