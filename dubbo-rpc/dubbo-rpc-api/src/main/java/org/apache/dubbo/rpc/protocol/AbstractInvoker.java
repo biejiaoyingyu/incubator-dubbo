@@ -38,7 +38,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * AbstractInvoker.是通用的抽象实现
+ * AbstractInvoker.是通用的抽象实,现默认实现（模板类）
  */
 public abstract class AbstractInvoker<T> implements Invoker<T> {
 
@@ -122,6 +122,12 @@ public abstract class AbstractInvoker<T> implements Invoker<T> {
         return getInterface() + " -> " + (getUrl() == null ? "" : getUrl().toString());
     }
 
+    /**
+     * 定义执行invoker的基础流程（模板），然后根据不同的实现子类（不同的协议）执行各自个性化的执行任务。
+     * @param inv
+     * @return
+     * @throws RpcException
+     */
     @Override
     public Result invoke(Invocation inv) throws RpcException {
         if (destroyed.get()) {

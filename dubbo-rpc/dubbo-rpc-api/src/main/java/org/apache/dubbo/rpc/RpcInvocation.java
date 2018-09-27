@@ -27,7 +27,7 @@ import java.util.Map;
 
 /**
  * RPC Invocation.
- *
+ * Invocation执行调用上下文环境，就是用一个Bean存储当前调用方法的参数，其本质就是一个普通的Bean而已
  * @serial Don't change the class name and properties.
  */
 public class RpcInvocation implements Invocation, Serializable {

@@ -40,7 +40,11 @@ import java.util.Set;
  * Note that retry causes latency.
  * <p>
  * <a href="http://en.wikipedia.org/wiki/Failover">Failover</a>
- *
+ * 通过< dubbo:service cluster = “failover” …/> 或 < dubbo:reference cluster=”failover” …/>
+ * 集群策略：服务调用后，如果出现失败，则重试其他服务提供者，默认重试2次，总共执行3次，重试次数由retries配置，dubbo集群默认方式。
+ * 源码分析FailoverClusterInvoker（FailoverCluster，dubbo默认策略）
+ * 策略：失败后自动选择其他服务提供者进行重试，重试次数由retries属性设置，< dubbo:reference retries = “2”/>设置，默认为2，代表重试2次，最多执行3次。
+
  */
 public class FailoverClusterInvoker<T> extends AbstractClusterInvoker<T> {
 
@@ -56,6 +60,9 @@ public class FailoverClusterInvoker<T> extends AbstractClusterInvoker<T> {
         List<Invoker<T>> copyinvokers = invokers;
         checkInvokers(copyinvokers, invocation);
         String methodName = RpcUtils.getMethodName(invocation);
+        /**
+         * 首先校验服务提供者列表，如果为空，则抛出RpcException，提示没有可用的服务提供者。
+         */
         int len = getUrl().getMethodParameter(methodName, Constants.RETRIES_KEY, Constants.DEFAULT_RETRIES) + 1;
         if (len <= 0) {
             len = 1;
@@ -63,20 +70,35 @@ public class FailoverClusterInvoker<T> extends AbstractClusterInvoker<T> {
         // retry loop.
         RpcException le = null; // last exception.
         List<Invoker<T>> invoked = new ArrayList<Invoker<T>>(copyinvokers.size()); // invoked invokers.
+        /**
+         * 构建Set< Stirng> providers,主要用来已调用服务提供者的地址，如果本次调用失败，将在日志信息中打印已调用的服务提供者信息。
+         */
         Set<String> providers = new HashSet<String>(len);
+        /**
+         * 循环执行次数，等于retries + 1 次。
+         */
         for (int i = 0; i < len; i++) {
             //Reselect before retry to avoid a change of candidate `invokers`.
             //NOTE: if `invokers` changed, then `invoked` also lose accuracy.
+            /**
+             * 如果i>0，表示服务调用，在重试，此时需要重新调用Directory#list方法，获取最小的服务提供者列表。
+             */
             if (i > 0) {
                 checkWhetherDestroyed();
                 copyinvokers = list(invocation);
                 // check again
                 checkInvokers(copyinvokers, invocation);
             }
+            /**
+             * 根据负载均衡算法，选择Invoker，后续详细分析。
+             */
             Invoker<T> invoker = select(loadbalance, invocation, copyinvokers, invoked);
             invoked.add(invoker);
             RpcContext.getContext().setInvokers((List) invoked);
             try {
+                /**
+                 * 根据负载算法，路由算法从服务提供者列表选一个服务提供者，发起RPC调用。
+                 */
                 Result result = invoker.invoke(invocation);
                 if (le != null && logger.isWarnEnabled()) {
                     logger.warn("Although retry the method " + methodName
@@ -98,6 +120,9 @@ public class FailoverClusterInvoker<T> extends AbstractClusterInvoker<T> {
             } catch (Throwable e) {
                 le = new RpcException(e.getMessage(), e);
             } finally {
+                /**
+                 * 将本次服务提供者的地址添加到providers集合中，如果多次重试后，无法完成正常的调用，将在错误日志中包含这些信息。
+                 */
                 providers.add(invoker.getUrl().getAddress());
             }
         }

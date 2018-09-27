@@ -40,7 +40,7 @@ import java.util.regex.Pattern;
 
 /**
  * ConditionRouter
- *
+ * 基于条件表达式的路由实现
  */
 public class ConditionRouter implements Router, Comparable<Router> {
 

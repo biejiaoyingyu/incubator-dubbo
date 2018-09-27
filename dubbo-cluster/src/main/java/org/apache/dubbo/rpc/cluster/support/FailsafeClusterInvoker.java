@@ -33,7 +33,8 @@ import java.util.List;
  * Usually used to write audit logs and other operations
  *
  * <a href="http://en.wikipedia.org/wiki/Fail-safe">Fail-safe</a>
- *
+ * 策略：服务调用失败后，只打印错误日志，然后返回服务调用成功。
+ * 场景：调用审计，日志类服务接口。
  */
 public class FailsafeClusterInvoker<T> extends AbstractClusterInvoker<T> {
     private static final Logger logger = LoggerFactory.getLogger(FailsafeClusterInvoker.class);
@@ -45,11 +46,20 @@ public class FailsafeClusterInvoker<T> extends AbstractClusterInvoker<T> {
     @Override
     public Result doInvoke(Invocation invocation, List<Invoker<T>> invokers, LoadBalance loadbalance) throws RpcException {
         try {
+            /**
+             * 查服务提供者，如果服务提供者列表为空，抛出没有服务提供者错误。
+             */
             checkInvokers(invokers, invocation);
+            /**
+             * 根据负载算法选择一个服务提供者。
+             */
             Invoker<T> invoker = select(loadbalance, invocation, invokers, null);
             return invoker.invoke(invocation);
         } catch (Throwable e) {
             logger.error("Failsafe ignore exception: " + e.getMessage(), e);
+            /**
+             * 发起RPC服务调用，如果出现异常，记录错误堆栈信息，并返回成功。
+             */
             return new RpcResult(); // ignore
         }
     }

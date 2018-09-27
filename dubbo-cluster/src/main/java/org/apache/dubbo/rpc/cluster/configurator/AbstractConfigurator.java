@@ -27,7 +27,7 @@ import java.util.Set;
 
 /**
  * AbstractOverrideConfigurator
- *
+ * 协议配置抽象实现类（模板类）
  */
 public abstract class AbstractConfigurator implements Configurator {
 
@@ -48,16 +48,33 @@ public abstract class AbstractConfigurator implements Configurator {
     @Override
     public URL configure(URL url) {
         if (configuratorUrl.getHost() == null || url == null || url.getHost() == null) {
+            /**
+             * 如果configuratorUrl (配置URL)的host为空，或url为空或host为空，则返回url。这里参数的覆盖方向 configuratorUrl —> url
+             */
             return url;
         }
         // If override url has port, means it is a provider address. We want to control a specific provider with this override url, it may take effect on the specific provider instance or on consumers holding this provider instance.
         if (configuratorUrl.getPort() != 0) {
+            /**
+             * 如果configuratorUrl如果端口不为空，则需要判断url的端口，端口必须相同，才执行configuratorUrl配置url
+             */
             if (url.getPort() == configuratorUrl.getPort()) {
+                /**
+                 * 该方法主要实现的功能就是排除不能动态修改的属性，不支持属性主要包括：category、check、dynamic、enabled、
+                 * 还有以~开头的属性，并且如果~开头的属性，配置URL与原URL的值不相同，则不使用该配置URL重写原URL。将配置URL
+                 * (configuratorUrl)移除不支持属性后，调用其子类的doConfigure方法覆盖属性，Dubbo默认支持如下覆盖策略
+                 * 1）override 直接覆盖。
+                 * 2）absent，如果原先存在该属性的配置，则以原先配置的属性值优先，如果原先没有配置该属性，则添加新的配置属性。
+                 */
                 return configureIfMatch(url.getHost(), url);
             }
         } else {// override url don't have a port, means the ip override url specify is a consumer address or 0.0.0.0
             // 1.If it is a consumer ip address, the intention is to control a specific consumer instance, it must takes effect at the consumer side, any provider received this override url should ignore;
             // 2.If the ip is 0.0.0.0, this override url can be used on consumer, and also can be used on provider
+            /**
+             * 如果端口为空，该配置URL(configuratorUrl)的类型要么是针对消费者，要么地址是0.0.0.0(任意)。
+             * 如果url属于服务消费者，host为消费者的注册IP地址，如果是服务提供者，则host为0.0.0.0来配置。
+             */
             if (url.getParameter(Constants.SIDE_KEY, Constants.PROVIDER).equals(Constants.CONSUMER)) {
                 return configureIfMatch(NetUtils.getLocalHost(), url);// NetUtils.getLocalHost is the ip address consumer registered to registry.
             } else if (url.getParameter(Constants.SIDE_KEY, Constants.CONSUMER).equals(Constants.PROVIDER)) {

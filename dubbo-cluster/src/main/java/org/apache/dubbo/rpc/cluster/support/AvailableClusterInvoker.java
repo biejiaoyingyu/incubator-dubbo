@@ -27,7 +27,10 @@ import java.util.List;
 
 /**
  * AvailableCluster
- *
+ * 通过< dubbo:service cluster = “available” …/> 或 < dubbo:reference cluster=”available” …/>
+ * 集群策略：总是选择第一个可用的服务提供者。
+ * 相当于服务的主备，但同时只有一个服务提供者承载流量，并没有使用集群的负载均衡机制。
+ * 遍历服务提供者列表，选择第一个可用服务提供者，然后执行RPC服务调用，如果调用失败，则失败。
  */
 public class AvailableClusterInvoker<T> extends AbstractClusterInvoker<T> {
 

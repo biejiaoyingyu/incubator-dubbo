@@ -25,6 +25,7 @@ import java.util.Map;
 
 /**
  * MockInvocation.java
+ * 用于mock单元测试用。
  */
 public class MockInvocation implements Invocation {
 

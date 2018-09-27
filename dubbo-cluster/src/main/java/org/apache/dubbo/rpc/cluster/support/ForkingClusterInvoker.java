@@ -39,6 +39,13 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Invoke a specific number of invokers concurrently, usually used for demanding real-time operations, but need to waste more service resources.
  *
  * <a href="http://en.wikipedia.org/wiki/Fork_(topology)">Fork</a>
+ *
+ * 通过< dubbo:service cluster = “forking” …/> 或 < dubbo:reference cluster=”forking” …/>
+ * 集群策略：并发调用多个服务提供者，取第一个返回的结果。可以通过forks设置并发调用的服务台提供者个数。
+ *
+ * 策略：并行调用多个服务提供者，当一个服务提供者返回成功，则返回成功。
+ * 场景：实时性要求比较高的场景，但浪费服务器资源，通常可以通过forks参数设置并发调用度。
+ *
  */
 public class ForkingClusterInvoker<T> extends AbstractClusterInvoker<T> {
 
@@ -57,8 +64,15 @@ public class ForkingClusterInvoker<T> extends AbstractClusterInvoker<T> {
     @SuppressWarnings({"unchecked", "rawtypes"})
     public Result doInvoke(final Invocation invocation, List<Invoker<T>> invokers, LoadBalance loadbalance) throws RpcException {
         try {
+            /**
+             * 检查服务提供者，如果服务提供者列表为空，抛出没有服务提供者错误。
+             */
             checkInvokers(invokers, invocation);
             final List<Invoker<T>> selected;
+            /**
+             * 获取forks属性，貌似只能通过在< dubbo:reference />用< dubbo:parameter key=”forks” value=”“/>来设置forks，其默认值为2，
+             * 如果forks值大于服务提供者的数量，则将调用所有服务提供者，如果forks值小于服务提供者的数量，则使用负载均衡算法，选择forks个服务提供者。
+             */
             final int forks = getUrl().getParameter(Constants.FORKS_KEY, Constants.DEFAULT_FORKS);
             final int timeout = getUrl().getParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);
             if (forks <= 0 || forks >= invokers.size()) {
@@ -77,6 +91,10 @@ public class ForkingClusterInvoker<T> extends AbstractClusterInvoker<T> {
             RpcContext.getContext().setInvokers((List) selected);
             final AtomicInteger count = new AtomicInteger();
             final BlockingQueue<Object> ref = new LinkedBlockingQueue<>();
+            /**
+             * 依次异步向服务提供者发起RPC调用，并将结果添加到BlockingQueue< Object> ref，如果服务调用发送错误，
+             * 并且发生错误的个数大于等于本次调用的个数，则将错误信息放入BlockingQueue< Object> ref，否则，将错误数增加1。
+             */
             for (final Invoker<T> invoker : selected) {
                 executor.execute(new Runnable() {
                     @Override
@@ -94,6 +112,10 @@ public class ForkingClusterInvoker<T> extends AbstractClusterInvoker<T> {
                 });
             }
             try {
+                /**
+                 * Object ret = ref.poll(timeout, TimeUnit.MILLISECONDS)，从该队列中获取结果，如果队列未空，
+                 * 则会阻塞等待，直到超时，当有一个调用成功后，将返回，忽略其他调用结果。
+                 */
                 Object ret = ref.poll(timeout, TimeUnit.MILLISECONDS);
                 if (ret instanceof Throwable) {
                     Throwable e = (Throwable) ret;

@@ -44,6 +44,10 @@ import java.util.concurrent.TimeUnit;
  *
  * <a href="http://en.wikipedia.org/wiki/Failback">Failback</a>
  *
+ * 通过< dubbo:service cluster = “failfast” …/> 或 < dubbo:reference cluster=”failfast” …/>
+ * 集群策略：服务调用后，快速失败，直接抛出异常，并不重试，也不受retries参数的制约，适合新增、修改类操作。??
+ * 调用失败后，返回成功，但会在后台定时重试，重试次数（反复） ??
+ * 场景：通常用于消息通知，但消费者重启后，重试任务丢失。
  */
 public class FailbackClusterInvoker<T> extends AbstractClusterInvoker<T> {
 
@@ -65,16 +69,29 @@ public class FailbackClusterInvoker<T> extends AbstractClusterInvoker<T> {
         super(directory);
     }
 
+
+    /**
+     * @param invocation 调用上下文
+     * @param router 调用集群策略
+     */
     private void addFailed(Invocation invocation, AbstractClusterInvoker<?> router) {
+        /**
+         * 如果retryFuture（ScheduledFuture< ?> retryFuture）为空，则加锁创建一个定时调度任务，任务以每隔5s的频率调用retryFailed方法。
+         */
         if (retryFuture == null) {
             synchronized (this) {
                 if (retryFuture == null) {
+                    /**
+                     * 添加重试任务（ConcurrentMap< Invocation, AbstractClusterInvoker< ?>> failed）。
+                     * 想必retryFailed方法就是遍历failed，一个一个重复调用，如果调用成功则移除，调用不成功，继续放入。
+                     */
                     retryFuture = scheduledExecutorService.scheduleWithFixedDelay(new Runnable() {
 
                         @Override
                         public void run() {
                             // collect retry statistics
                             try {
+                                //in
                                 retryFailed();
                             } catch (Throwable t) { // Defensive fault tolerance
                                 logger.error("Unexpected error occur at collect statistic", t);
@@ -87,6 +104,9 @@ public class FailbackClusterInvoker<T> extends AbstractClusterInvoker<T> {
         failed.put(invocation, router);
     }
 
+    /**
+     * 遍历待重试列表，然后发起远程调用，如果调用成功，则从集合中移除，如果只选失败，并不会从待重试列表中移除，也就是在消费端不重启的情况下，会一直重复调用，直到成功。
+     */
     void retryFailed() {
         if (failed.size() == 0) {
             return;
@@ -106,12 +126,21 @@ public class FailbackClusterInvoker<T> extends AbstractClusterInvoker<T> {
     @Override
     protected Result doInvoke(Invocation invocation, List<Invoker<T>> invokers, LoadBalance loadbalance) throws RpcException {
         try {
+            /**
+             * 校验服务提供者列表，如果为空，则抛出没有服务提供者错误。
+             */
             checkInvokers(invokers, invocation);
+            /**
+             * 根据负载均衡机制，选择一个服务提供者。
+             */
             Invoker<T> invoker = select(loadbalance, invocation, invokers, null);
             return invoker.invoke(invocation);
         } catch (Throwable e) {
             logger.error("Failback to invoke method " + invocation.getMethodName() + ", wait for retry in background. Ignored exception: "
                     + e.getMessage() + ", ", e);
+            /**
+             * 发起远程服务调用，如果出现异常，调用addFailed方法，添加重试任务，然后返回给调用方成功。
+             */
             addFailed(invocation, this);
             return new RpcResult(); // ignore
         }

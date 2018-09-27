@@ -331,18 +331,79 @@ public class RegistryProtocol implements Protocol {
         return ExtensionLoader.getExtensionLoader(Cluster.class).getExtension("mergeable");
     }
 
+    /**
+     * @param cluster 集群策略
+     * @param registry 注册中心实现类。
+     * @param type 引用服务名，dubbo:reference interface。
+     * @param url 注册中心URL。
+     * @param <T>
+     * @return
+     */
     private <T> Invoker<T> doRefer(Cluster cluster, Registry registry, Class<T> type, URL url) {
+        /**
+         * 构建RegistryDirectory对象，基于注册中心动态发现服务提供者（服务提供者新增或减少），本节重点会剖析该类的实现细节。
+         */
         RegistryDirectory<T> directory = new RegistryDirectory<T>(type, url);
+        /**
+         * 为RegistryDirectory设置注册中心、协议。
+         */
         directory.setRegistry(registry);
         directory.setProtocol(protocol);
         // all attributes of REFER_KEY
+        /**
+         * 获取服务消费者的配置属性。
+         */
         Map<String, String> parameters = new HashMap<String, String>(directory.getUrl().getParameters());
+        /**
+         * 构建消费者URL
+         * consumer://192.168.56.1/com.alibaba.dubbo.demo.DemoService?
+         * application=demo-consumer&
+         * check=false&
+         * dubbo=2.0.0&
+         * interface=com.alibaba.dubbo.demo.DemoService&
+         * methods=sayHello&
+         * pid=9892&
+         * qos.port=33333&
+         * side=consumer&
+         * timestamp=1528380277185
+         */
         URL subscribeUrl = new URL(Constants.CONSUMER_PROTOCOL, parameters.remove(Constants.REGISTER_IP_KEY), 0, type.getName(), parameters);
+        /**
+         * 向注册中心消息消费者：
+         * 相比于上一步URL，增加了category=consumers、check=false，其中category表示在注册中心的命令空间，
+         * 这里代表消费端。该步骤的作用就是向注册中心为服务增加一个消息消费者
+         * consumer://192.168.56.1/com.alibaba.dubbo.demo.DemoService?
+         * application=demo-consumer&
+         * category=consumers&
+         * check=false&
+         * dubbo=2.0.0&
+         * interface=com.alibaba.dubbo.demo.DemoService&
+         * methods=sayHello&
+         * pid=9892&
+         * qos.port=33333&
+         * side=consumer&
+         * timestamp=1528380277185
+         */
         if (!Constants.ANY_VALUE.equals(url.getServiceInterface())
                 && url.getParameter(Constants.REGISTER_KEY, true)) {
             registry.register(subscribeUrl.addParameters(Constants.CATEGORY_KEY, Constants.CONSUMERS_CATEGORY,
                     Constants.CHECK_KEY, String.valueOf(false)));
         }
+        /**
+         * 为消息消费者添加category=providers,configurators,routers属性后，然后向注册中心订阅该URL，关注该服务下的
+         * providers,configurators,routers发生变化时通知RegistryDirectory，以便及时发现服务提供者、配置、路由规则的变化。
+         * consumer://192.168.56.1/com.alibaba.dubbo.demo.DemoService?
+         * application=demo-consumer&
+         * category=providers,configurators,routers&
+         * check=false&
+         * dubbo=2.0.0&
+         * interface=com.alibaba.dubbo.demo.DemoService
+         * methods=sayHello&
+         * pid=9892&
+         * qos.port=33333&
+         * side=consumer&
+         * timestamp=1528380277185
+         */
         directory.subscribe(subscribeUrl.addParameter(Constants.CATEGORY_KEY,
                 Constants.PROVIDERS_CATEGORY
                         + "," + Constants.CONFIGURATORS_CATEGORY

@@ -23,20 +23,21 @@ public interface Node {
 
     /**
      * get url.
-     *
+     * 获取URL，在dubbo中，注册中心、服务提供者、服务消费者、监控中心等都使用URL描述。
      * @return url.
      */
     URL getUrl();
 
     /**
      * is available.
-     *
+     * 判断是否可用。
      * @return available.
      */
     boolean isAvailable();
 
     /**
      * destroy.
+     * 资源销毁。
      */
     void destroy();
 

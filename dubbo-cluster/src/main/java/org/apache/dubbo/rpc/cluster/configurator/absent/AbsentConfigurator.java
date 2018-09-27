@@ -21,7 +21,7 @@ import org.apache.dubbo.rpc.cluster.configurator.AbstractConfigurator;
 
 /**
  * AbsentConfigurator
- *
+ * absent配置器，其策略是，如果configureUrl存在的属性，则不覆盖。
  */
 public class AbsentConfigurator extends AbstractConfigurator {
 

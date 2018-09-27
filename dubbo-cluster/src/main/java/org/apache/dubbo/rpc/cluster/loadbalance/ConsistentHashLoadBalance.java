@@ -33,7 +33,8 @@ import java.util.concurrent.ConcurrentMap;
 
 /**
  * ConsistentHashLoadBalance
- *
+ * 可以通过< dubbo:service loadbalance=”consistenthash” …/>或< dubbo:service loadbalance = “consistenthash” …/>
+ * 负载均衡算法：一致性Hash算法，在AbstractClusterInvoker中从多个服务提供者中选择一个服务提供者时被调用。
  */
 public class ConsistentHashLoadBalance extends AbstractLoadBalance {
     public static final String NAME = "consistenthash";

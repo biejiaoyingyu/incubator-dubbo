@@ -40,7 +40,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * ScriptRouter
- *
+ * 基于JS引擎的路由实现。
  */
 public class ScriptRouter implements Router {
 

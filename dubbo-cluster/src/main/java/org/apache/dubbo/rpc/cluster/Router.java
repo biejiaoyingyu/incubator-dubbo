@@ -27,7 +27,7 @@ import java.util.List;
  * Router. (SPI, Prototype, ThreadSafe)
  * <p>
  * <a href="http://en.wikipedia.org/wiki/Routing">Routing</a>
- *
+ * 根据消息消费者URL，结合路由表达式或JS引擎，从Directory中选择符合路由规则的Invoker，再执行负载均衡算法。
  * @see org.apache.dubbo.rpc.cluster.Cluster#join(Directory)
  * @see org.apache.dubbo.rpc.cluster.Directory#list(Invocation)
  */
@@ -35,14 +35,14 @@ public interface Router extends Comparable<Router> {
 
     /**
      * get the router url.
-     *
+     * 获取消息消费者URL。
      * @return url
      */
     URL getUrl();
 
     /**
      * route.
-     *
+     * 根据消息消费者URL，从invokers中筛选合适的Invokers。
      * @param invokers
      * @param url        refer url
      * @param invocation

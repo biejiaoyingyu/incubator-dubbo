@@ -20,21 +20,25 @@ import org.apache.dubbo.common.URL;
 
 /**
  * Configurator. (SPI, Prototype, ThreadSafe)
- *
+ * 协议配置接口
+ * -----------------------------
+ * 当在dubbo-admin(管理后台)中创建一条override规则后，会首先存储在注册中心
+ * （zookeeper的指定目录下${service}/configurators目录下，此时基于注册中心的事件机制，
+ * 通知相关监听者（服务消费者），服务消费者收到最新的配置时，会根据最新的配置重新构建Invoker
+ * 对象，然后销毁原先的Invoker对象。
  */
 public interface Configurator extends Comparable<Configurator> {
 
     /**
      * get the configurator url.
-     *
+     * 获取配置URL
      * @return configurator url.
      */
     URL getUrl();
 
     /**
      * Configure the provider url.
-     * O
-     *
+     * 根据configureUrl来配置 URL url
      * @param url - old rovider url.
      * @return new provider url.
      */

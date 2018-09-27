@@ -41,6 +41,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * AbstractClusterInvoker
+ * 集群模式调用模板类
+ * 该类为Dubbo集群模式的调用模板类，主题解决一个服务服务有多个服务提供者，
+ * 此时消息消费端在调用服务时如何选择具体的服务提供者。该类需要组织多个服
+ * 务提供者，并按照指定算法选择一服务提供者进行调用。
+ *
+ * -------------------------------------------------------------
+ *
+ * 更多的集群策略，可以参考/dubbo-cluster/src/main/resources/META-INF/dubbo/internal/com.alibaba.dubbo.rpc.cluster.Cluster文件
  */
 public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
 
@@ -103,10 +111,10 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
      * the selected invoker has the minimum chance to be one in the previously selected list, and also
      * guarantees this invoker is available.
      *
-     * @param loadbalance load balance policy
-     * @param invocation  invocation
-     * @param invokers    invoker candidates
-     * @param selected    exclude selected invokers or not
+     * @param loadbalance load balance policy 负载均衡算法
+     * @param invocation  invocation  服务调用上下文环境
+     * @param invokers    invoker candidates 待选的服务提供者列表
+     * @param selected    exclude selected invokers or not  本次集群测试，已选择的服务提供者。
      * @return the invoker which will final to do invoke.
      * @throws RpcException
      */
@@ -116,6 +124,10 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
         }
         String methodName = invocation == null ? "" : invocation.getMethodName();
 
+        /**
+         * sticky机制（粘性），如果开启了粘性机制的话。通过< dubbo:method sticky=”true”/>,默认不开启。如果开启，
+         * 上一次该服务调用的是哪个服务提供者，只要调用过程中不发生错误，后续都会选择该服务提供者进行调用。
+         */
         boolean sticky = invokers.get(0).getUrl().getMethodParameter(methodName, Constants.CLUSTER_STICKY_KEY, Constants.DEFAULT_CLUSTER_STICKY);
         {
             //ignore overloaded method
@@ -129,6 +141,9 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
                 }
             }
         }
+        /**
+         * 执行doSelect选择。
+         */
         Invoker<T> invoker = doSelect(loadbalance, invocation, invokers, selected);
 
         if (sticky) {
@@ -137,17 +152,35 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
         return invoker;
     }
 
+    /**
+     *
+     * @param loadbalance
+     * @param invocation
+     * @param invokers
+     * @param selected
+     * @return
+     * @throws RpcException
+     */
     private Invoker<T> doSelect(LoadBalance loadbalance, Invocation invocation, List<Invoker<T>> invokers, List<Invoker<T>> selected) throws RpcException {
         if (invokers == null || invokers.isEmpty())
             return null;
-        if (invokers.size() == 1)
-            return invokers.get(0);
+        /**
+         * 如果可选Invoker只有一个的话，直接返回该Invoker。
+         */
+        if (invokers.size() == 1) return invokers.get(0);
+
+        /**
+         * 调用loadBalance负载均衡算法，选择一个服务提供者。
+         */
         Invoker<T> invoker = loadbalance.select(invokers, getUrl(), invocation);
 
         //If the `invoker` is in the  `selected` or invoker is unavailable && availablecheck is true, reselect.
-        if ((selected != null && selected.contains(invoker))
-                || (!invoker.isAvailable() && getUrl() != null && availablecheck)) {
+        if ((selected != null && selected.contains(invoker)) || (!invoker.isAvailable() && getUrl() != null && availablecheck)) {
             try {
+                /**
+                 * 如果选择的Invoker已被选择，则重新选择，这里有一个疑问，为什么不在选之前，先过滤掉已被选的Invoker。
+                 * 从服务提供者列表中选择一个服务提供者算法就介绍到这里，接下来将一一分析Dubbo提供的集群容错方式。
+                 */
                 Invoker<T> rinvoker = reselect(loadbalance, invocation, invokers, selected, availablecheck);
                 if (rinvoker != null) {
                     invoker = rinvoker;
@@ -224,6 +257,12 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
         return null;
     }
 
+    /**
+     *
+     * @param invocation
+     * @return
+     * @throws RpcException
+     */
     @Override
     public Result invoke(final Invocation invocation) throws RpcException {
         checkWhetherDestroyed();
@@ -233,10 +272,30 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
         if (contextAttachments != null && contextAttachments.size() != 0) {
             ((RpcInvocation) invocation).addAttachments(contextAttachments);
         }
-
+        /**
+         * 根据调用上下文，获取服务提供者列表，服务提供者从Directory中获取。
+         *
+         * 最终会调用RegistryDirecotry的list方法，该方法的服务提供者是当该消费者订阅的服务的服务提
+         * 供者列表发送变化后，会在注册中心产生事件，然后通知消费者更新服务提供者列表（本地缓存）。需要
+         * 注意的是RegistryDirecotry在返回Invoker之前，已经使用Router进行了一次筛选，具体实现在
+         * RegistryDirectory#notify方法时。
+         *
+         */
         List<Invoker<T>> invokers = list(invocation);
+
+        /**
+         * 根据SPI机制，获取负载均衡算法的实现类,根据< dubbo:consumer loadbalance=”“/>、
+         * < dubbo:reference loadbalance=”“/>等标签的配置值，默认为random，加权随机算法。
+         */
         LoadBalance loadbalance = initLoadBalance(invokers, invocation);
         RpcUtils.attachInvocationIdIfAsync(getUrl(), invocation);
+        /**
+         * 根据调用上下文，服务提供者列表，负载均衡算法选择一服务提供者，具体代码有AbstractClusterInvoker的各个子类实现。
+         *
+         * -----------------------------------------------------------------
+         * Dubbo目前支持的集群容错策略在中/dubbo-cluster/src/main/resources/META-INF/dubbo/internal/com.alibaba.dubbo.rpc.cluster.Cluster定义
+         * 对应的执行器为Cluser+Invoker,例如FailoverCluster对应的Invoker为：FailoverClusterInvoker。
+         */
         return doInvoke(invocation, invokers, loadbalance);
     }
 

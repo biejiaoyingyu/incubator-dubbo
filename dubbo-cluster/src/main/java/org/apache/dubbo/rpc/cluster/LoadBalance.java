@@ -30,7 +30,10 @@ import java.util.List;
  * LoadBalance. (SPI, Singleton, ThreadSafe)
  * <p>
  * <a href="http://en.wikipedia.org/wiki/Load_balancing_(computing)">Load-Balancing</a>
+ * 当一个服务有多个服务提供者时，消费端在进行服务调用时选择服务服务提供者的负载均衡算法。
  *
+ * 其配置使用，通常一般在< dubbo:consumer/>、< dubbo:service />、< dubbo:reference />的loadbalance属性配置，
+ * 通常< dubbo:consumer/>这个属性指定消费端的默认策略，某些服务需要指定特殊负载均衡策略的话，一般通过< dubbo:reference />来指定。
  * @see org.apache.dubbo.rpc.cluster.Cluster#join(Directory)
  */
 @SPI(RandomLoadBalance.NAME)

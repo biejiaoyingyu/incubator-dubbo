@@ -26,7 +26,8 @@ import java.util.List;
 
 /**
  * AbstractLoadBalance
- *
+ * 可以通过< dubbo:service loadbalance=”roundrobin” …/>或< dubbo:service loadbalance = “roundrobin” …/>
+ * 负载均衡算法：加权轮询算法。
  */
 public abstract class AbstractLoadBalance implements LoadBalance {
 

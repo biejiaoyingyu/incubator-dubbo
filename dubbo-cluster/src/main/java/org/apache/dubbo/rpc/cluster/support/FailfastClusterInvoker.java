@@ -33,6 +33,10 @@ import java.util.List;
  *
  * <a href="http://en.wikipedia.org/wiki/Fail-fast">Fail-fast</a>
  *
+ * 通过< dubbo:service cluster = “failsafe” …/> 或 < dubbo:reference cluster=”failsafe” …/>
+ * 集群策略：服务调用后，只打印错误日志，然后直接返回。
+ * 策略：快速失败，服务调用失败后立马抛出异常，不进行重试。
+ * 场景：是否修改类服务（未实行幂等的服务调用）
  */
 public class FailfastClusterInvoker<T> extends AbstractClusterInvoker<T> {
 
@@ -42,11 +46,23 @@ public class FailfastClusterInvoker<T> extends AbstractClusterInvoker<T> {
 
     @Override
     public Result doInvoke(Invocation invocation, List<Invoker<T>> invokers, LoadBalance loadbalance) throws RpcException {
+        /**
+         * 检查服务提供者，如果服务提供者列表为空，抛出没有服务提供者错误。
+         */
         checkInvokers(invokers, invocation);
+        /**
+         * 根据负载算法选择一个服务提供者。
+         */
         Invoker<T> invoker = select(loadbalance, invocation, invokers, null);
         try {
+            /**
+             * 发起RPC服务调用。
+             */
             return invoker.invoke(invocation);
         } catch (Throwable e) {
+            /**
+             * 如果服务调用异常，抛出异常，打印服务消费者，服务提供者信息。
+             */
             if (e instanceof RpcException && ((RpcException) e).isBiz()) { // biz exception.
                 throw (RpcException) e;
             }
