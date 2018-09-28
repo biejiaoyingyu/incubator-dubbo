@@ -30,21 +30,21 @@ public interface ChannelHandler {
 
     /**
      * on channel connected.
-     *
+     * 连接事件，当收到客户端的连接事件时，执行该方法处理相关业务操作。
      * @param channel channel.
      */
     void connected(Channel channel) throws RemotingException;
 
     /**
      * on channel disconnected.
-     *
+     * 连接断开事件
      * @param channel channel.
      */
     void disconnected(Channel channel) throws RemotingException;
 
     /**
      * on message sent.
-     *
+     * 当可写事件触发时，服务端向客户端返回响应数据，就是通过该方法发送的。
      * @param channel channel.
      * @param message message.
      */
@@ -52,7 +52,7 @@ public interface ChannelHandler {
 
     /**
      * on message received.
-     *
+     * 当读事件触发时执行该方法，服务端在收到客户端的请求数据是，调用该方法执行解包等操作。
      * @param channel channel.
      * @param message message.
      */
@@ -60,7 +60,7 @@ public interface ChannelHandler {
 
     /**
      * on exception caught.
-     *
+     * 发生异常时，调用该方法。
      * @param channel   channel.
      * @param exception exception.
      */

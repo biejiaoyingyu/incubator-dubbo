@@ -43,8 +43,16 @@ public class ChannelHandlers {
         INSTANCE = instance;
     }
 
+    /**
+     * 这里是典型的装饰模式，MultiMessageHandler，多消息处理Handler,HeartbeatHandler，
+     * 心跳Handler,其主要功能是处理心跳返回与心跳请求，直接在IO线程中执行，每次收到信息，
+     * 更新通道的读事件戳，每次发送数据时，记录通道的写事件戳。这里的核心关键是利用SPI自适配，
+     * 返回合适的事件派发机制。
+     * @param handler
+     * @param url
+     * @return
+     */
     protected ChannelHandler wrapInternal(ChannelHandler handler, URL url) {
-        return new MultiMessageHandler(new HeartbeatHandler(ExtensionLoader.getExtensionLoader(Dispatcher.class)
-                .getAdaptiveExtension().dispatch(handler, url)));
+        return new MultiMessageHandler(new HeartbeatHandler(ExtensionLoader.getExtensionLoader(Dispatcher.class).getAdaptiveExtension().dispatch(handler, url)));
     }
 }

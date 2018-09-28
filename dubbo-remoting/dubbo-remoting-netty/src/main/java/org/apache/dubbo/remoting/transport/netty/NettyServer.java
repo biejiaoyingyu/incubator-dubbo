@@ -45,7 +45,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * NettyServer
+ *  NettyServer
+ *  一条TCP连接进行传输，在网络层至少要考虑如下问题：
+ *  1、服务端，客户端网络通讯模型（线程模型）
+ *  2、传输（编码解码、序列化）。
+ *  3、服务端转发策略等。
  */
 public class NettyServer extends AbstractServer implements Server {
 
@@ -57,7 +61,20 @@ public class NettyServer extends AbstractServer implements Server {
 
     private org.jboss.netty.channel.Channel channel;
 
+    /**
+     *
+     * @param url  服务提供者URL
+     * @param handler  ChannelHandler网络事件处理器,也就是当相应网络事件触发时，执行的事件处理器。
+     * @throws RemotingException
+     */
     public NettyServer(URL url, ChannelHandler handler) throws RemotingException {
+        /**
+         * 调用ChannelHandlers.wrap对原生Handler进行包装，然后调用其父类的构造方法，
+         * 首先，设置Dubbo服务端线程池中线程的名称，可以通过参数threadname来指定线程池中线程的前缀，
+         * 默认为：DubboServerHandler + dubbo服务端IP与接口号。
+         * 我比较好奇的是这里为什么需要对ChannelHandler进行包装呢？
+         * 是增加了些什么逻辑呢？----------->事件派发机制。
+         */
         super(url, ChannelHandlers.wrap(handler, ExecutorUtil.setThreadName(url, SERVER_THREAD_POOL_NAME)));
     }
 
