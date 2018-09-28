@@ -22,6 +22,8 @@ import org.apache.dubbo.remoting.Dispatcher;
 
 /**
  * Direct dispatcher
+ *
+ * 直接派发，也就是所有的事件全部在IO线程中执行，故其实现非常简单：
  */
 public class DirectDispatcher implements Dispatcher {
 

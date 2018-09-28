@@ -33,6 +33,9 @@ import java.util.concurrent.RejectedExecutionException;
 /**
  * Only request message will be dispatched to thread pool. Other messages like response, connect, disconnect,
  * heartbeat will be directly executed by I/O thread.
+ *
+ *  对应事件派件器：ExecutionDispatcher，其配置值：execution,从其源码的实现来看，与AllDispatcher实现基本类似，
+ *  唯一的区别是，如果executor线程池为空时，并不会使用共享线程池，目前我还想不出什么情况下，线程池会初始化失败。
  */
 public class ExecutionChannelHandler extends WrappedChannelHandler {
 

@@ -429,21 +429,39 @@ public class DubboProtocol extends AbstractProtocol {
         return invoker;
     }
 
+    /**
+     * 在创建Invoker时，通过getClient方法，开始Client（连接的）创建过程
+     * @param url 参数URL,服务提供者URL。
+     * @return
+     */
     private ExchangeClient[] getClients(URL url) {
         // whether to share connection
         boolean service_share_connect = false;
+        /**
+         * 获取< dubbo:reference connections = “” />，默认0表示客户端对同一个服务提供者的所有服务，
+         * 使用共享一个连接，如果该值有设置，则使用非共享的客户端，所谓的共享客户端，以Netty为例，也即客
+         * 户端对同一服务提供者发起的不同服务，使用同一个客户端(NettyClient)进行请求的发送与接收。
+         */
         int connections = url.getParameter(Constants.CONNECTIONS_KEY, 0);
         // if not configured, connection is shared, otherwise, one connection for one service
         if (connections == 0) {
             service_share_connect = true;
             connections = 1;
         }
-
+        /**
+         * 根据connections，创建ExchangeClients数组。
+         */
         ExchangeClient[] clients = new ExchangeClient[connections];
         for (int i = 0; i < clients.length; i++) {
             if (service_share_connect) {
+                /**
+                 * 如果使用共享连接，则调用getSharedClient获取共享连接，如果客户端未建立，则创建客户端。
+                 */
                 clients[i] = getSharedClient(url);
             } else {
+                /**
+                 * 如果不使用共享连接，调用initClient创建客户端，
+                 */
                 clients[i] = initClient(url);
             }
         }

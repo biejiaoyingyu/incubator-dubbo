@@ -42,13 +42,31 @@ public abstract class AbstractServer extends AbstractEndpoint implements Server 
     protected static final String SERVER_THREAD_POOL_NAME = "DubboServerHandler";
     private static final Logger logger = LoggerFactory.getLogger(AbstractServer.class);
     ExecutorService executor;
+    /**
+     *  url host:port地址
+     */
     private InetSocketAddress localAddress;
+    /**
+     *  如果是多网卡，并且指定了 bind.ip、bind.port，如果为空，与localAddress相同。
+     */
     private InetSocketAddress bindAddress;
+    /**
+     *  AbstractServer#accepts未使用到
+     */
     private int accepts;
+    /**
+     * AbstractServer#accepts未使用到。
+     */
     private int idleTimeout = 600; //600 seconds
 
     public AbstractServer(URL url, ChannelHandler handler) throws RemotingException {
+        /**
+         * 调用父类的构造方法，主要初始化AbstractPeer（channelHandler、url）和AbstractEndpoint（codec2、timeout、idleTimeout ）
+         */
         super(url, handler);
+        /**
+         * 根据URL中的host与端口，创建localAddress。
+         */
         localAddress = getUrl().toInetSocketAddress();
 
         String bindIp = getUrl().getParameter(Constants.BIND_IP_KEY, getUrl().getHost());
@@ -56,10 +74,20 @@ public abstract class AbstractServer extends AbstractEndpoint implements Server 
         if (url.getParameter(Constants.ANYHOST_KEY, false) || NetUtils.isInvalidLocalHost(bindIp)) {
             bindIp = NetUtils.ANYHOST;
         }
+        /**
+         * 如果配置了< dubbo:parameter key = “bind.ip” value = “”/> 与 < dubbo:parameter key = “bind.port” />，
+         * 则用该IP与端口创建bindAddress，通常用于多网卡，如果未配置，bindAddress与 localAddress绑定的IP与端口一样。
+         */
         bindAddress = new InetSocketAddress(bindIp, bindPort);
+        /**
+         * 初始化accepts与idleTimeout ,这两个参数未被其他地方使用。
+         */
         this.accepts = url.getParameter(Constants.ACCEPTS_KEY, Constants.DEFAULT_ACCEPTS);
         this.idleTimeout = url.getParameter(Constants.IDLE_TIMEOUT_KEY, Constants.DEFAULT_IDLE_TIMEOUT);
         try {
+            /**
+             * 调用doOpen方法，正式在相应端口建立网络监听。s
+             */
             doOpen();
             if (logger.isInfoEnabled()) {
                 logger.info("Start " + getClass().getSimpleName() + " bind " + getBindAddress() + ", export " + getLocalAddress());

@@ -32,14 +32,33 @@ import org.apache.dubbo.remoting.transport.ChannelHandlerDelegate;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * 纵观Dubbo ChannelHanler体系的设计，是经典的类装饰器模式，上述派发器主要解决的问题，
+ * 是相关网络事件（连接、读（请求）、写（响应）、心跳请求、心跳响应）是在IO线程、还是在
+ * 额外定义的线程池，故WrappedChannelHandler的主要职责是定义线程池相关的逻辑，具体是
+ * 在IO线程上执行，还是在定义的线程池中执行，则由子类具体去定制，WrappedChannelHandler
+ * 默认实现ChannelHandler的所有方法，各个方法的实现直接调用被装饰Handler的方法
+ */
+
 public class WrappedChannelHandler implements ChannelHandlerDelegate {
 
     protected static final Logger logger = LoggerFactory.getLogger(WrappedChannelHandler.class);
 
+    /**
+     * 共享线程池，默认线程池，如果ExecutorService executor为空，则使用SHARED_EXECUTOR
+     */
     protected static final ExecutorService SHARED_EXECUTOR = Executors.newCachedThreadPool(new NamedThreadFactory("DubboSharedHandler", true));
 
+
+    /**
+     * 定义的线程池
+     */
     protected final ExecutorService executor;
 
+
+    /**
+     * 被装饰的ChannelHandlers
+     */
     protected final ChannelHandler handler;
 
     protected final URL url;
@@ -47,6 +66,10 @@ public class WrappedChannelHandler implements ChannelHandlerDelegate {
     public WrappedChannelHandler(ChannelHandler handler, URL url) {
         this.handler = handler;
         this.url = url;
+
+        /**
+         * 构建线程池，这里基于SPI机制，用户可选择cached、eager、fixed、limited，将在本节下面详细介绍，这里只需要知道是构建了一个线程池。
+         */
         executor = (ExecutorService) ExtensionLoader.getExtensionLoader(ThreadPool.class).getAdaptiveExtension().getExecutor(url);
 
         String componentKey = Constants.EXECUTOR_SERVICE_COMPONENT_KEY;
@@ -54,6 +77,10 @@ public class WrappedChannelHandler implements ChannelHandlerDelegate {
             componentKey = Constants.CONSUMER_SIDE;
         }
         DataStore dataStore = ExtensionLoader.getExtensionLoader(DataStore.class).getDefaultExtension();
+
+        /**
+         * 将服务端都与线程池缓存起来，在服务端，线程池的缓存级别是 服务提供者协议（端口）：线程池。
+         */
         dataStore.put(componentKey, Integer.toString(url.getPort()), executor);
     }
 

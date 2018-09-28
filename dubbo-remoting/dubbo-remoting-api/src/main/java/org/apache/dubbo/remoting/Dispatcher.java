@@ -24,6 +24,15 @@ import org.apache.dubbo.remoting.transport.dispatcher.all.AllDispatcher;
 
 /**
  * ChannelHandlerWrapper (SPI, Singleton, ThreadSafe)
+ *
+ * Dispatch
+ *  所有的sent事件方法、心跳请求全部在IO线程上执行。
+ *  1、all :  除sent事件回调方法、心跳外，全部在线程池上执行。
+ *  2、execution :  与all类似，唯一区就是all在线程池未指定时，可以使用共享线程池，这个差别等同于没有。
+ *  3、 message :  只有请求事件在线程池中执行，其他在IO线程上执行。
+ *  4、connection :  请求事件在线程池中执行，连接、断开连接事件排队执行（含一个线程的线程池）
+ *  5、direct :  所有事件都在IO线程中执行。
+ *
  */
 @SPI(AllDispatcher.NAME)
 public interface Dispatcher {

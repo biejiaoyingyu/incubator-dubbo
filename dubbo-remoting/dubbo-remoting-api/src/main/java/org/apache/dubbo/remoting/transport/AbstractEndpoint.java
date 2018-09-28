@@ -29,15 +29,25 @@ import org.apache.dubbo.remoting.transport.codec.CodecAdapter;
 
 /**
  * AbstractEndpoint
+ * 这些属性都是以第一个加载到的服务提供者的配置，不科学？超时机制需要后续关注
  */
 public abstract class AbstractEndpoint extends AbstractPeer implements Resetable {
 
     private static final Logger logger = LoggerFactory.getLogger(AbstractEndpoint.class);
 
+    /**
+     * 编码解码器， 注，如果通过dubbo:provider改变codec,不同的服务提供者引用的默认服务提供者参数不同，那这个只能是以第一个为主了，应该不科学？
+     */
     private Codec2 codec;
 
+    /**
+     *  超时时间
+     */
     private int timeout;
 
+    /**
+     * 连接超时时间
+     */
     private int connectTimeout;
 
     public AbstractEndpoint(URL url, ChannelHandler handler) {

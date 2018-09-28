@@ -41,6 +41,12 @@ public class ConnectionOrderedChannelHandler extends WrappedChannelHandler {
     protected final ThreadPoolExecutor connectionExecutor;
     private final int queuewarninglimit;
 
+    /**
+     * 重点关注一下connectionExecutor ，用来执行连接、断开事件的线程池，线程池中只有一个线程，
+     * 并且队列可以选择时有界队列，通过connect.queue.capacity属性配置，超过的事件，则拒绝执行。
+     * @param handler
+     * @param url
+     */
     public ConnectionOrderedChannelHandler(ChannelHandler handler, URL url) {
         super(handler, url);
         String threadName = url.getParameter(Constants.THREAD_NAME_KEY, Constants.DEFAULT_THREAD_NAME);
@@ -53,6 +59,12 @@ public class ConnectionOrderedChannelHandler extends WrappedChannelHandler {
         queuewarninglimit = url.getParameter(Constants.CONNECT_QUEUE_WARNING_SIZE, Constants.DEFAULT_CONNECT_QUEUE_WARNING_SIZE);
     }
 
+    /**
+     * 检查队列长度，如果超过警告值，则输出警告信息，然后提交连接线程池中执行，
+     * disconnected事件类似。其他received、caught事件，则与AllDispatcher相同，就不在重复。
+     * @param channel
+     * @throws RemotingException
+     */
     @Override
     public void connected(Channel channel) throws RemotingException {
         try {

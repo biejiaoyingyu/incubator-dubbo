@@ -22,6 +22,7 @@ import org.apache.dubbo.remoting.Dispatcher;
 
 /**
  * connect disconnect ensure the order
+ * 事件派发器：连接、断开连接事件排队执行，并可通过connect.queue.capacity属性设置队列长度，请求事件、异常事件在线程池中执行。
  */
 public class ConnectionOrderedDispatcher implements Dispatcher {
 

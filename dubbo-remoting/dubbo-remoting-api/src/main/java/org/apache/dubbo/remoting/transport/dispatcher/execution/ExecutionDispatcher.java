@@ -22,6 +22,9 @@ import org.apache.dubbo.remoting.Dispatcher;
 
 /**
  * In addition to sending all the use thread pool processing
+ * 其配置值：execution,从其源码的实现来看，与AllDispatcher实现基本类似，
+ * 唯一的区别是，如果executor线程池为空时，并不会使用共享线程池，
+ * 目前我还想不出什么情况下，线程池会初始化失败。
  */
 public class ExecutionDispatcher implements Dispatcher {
 

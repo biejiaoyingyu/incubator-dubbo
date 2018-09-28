@@ -43,20 +43,37 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * ExchangeServerImpl
  * 基于协议头的服务端交互机
+ *
+ * 说明，主要是通过heartbeat参数设置心跳间隔，如果不配置，则不启动心跳检测。从上面看来HeaderExchangeServer内部持有Server,并封装了心跳的功能，
  */
 public class HeaderExchangeServer implements ExchangeServer {
 
     protected final Logger logger = LoggerFactory.getLogger(getClass());
 
+    /**
+     * 心跳线程数，线程名称前缀，dubbo-remoting-server-heartbeat-thread-序号
+     */
     private final ScheduledExecutorService scheduled = Executors.newScheduledThreadPool(1,
             new NamedThreadFactory(
                     "dubbo-remoting-server-heartbeat",
                     true));
+    /**
+     * 具体的Server实现类，例如NettyServer
+     */
     private final Server server;
     // heartbeat timer
+    /**
+     * 心跳调度Future，可以通过future取消心跳等动作。
+     */
     private ScheduledFuture<?> heartbeatTimer;
     // heartbeat timeout (ms), default value is 0 , won't execute a heartbeat.
+    /**
+     * 心跳间隔时间
+     */
     private int heartbeat;
+    /**
+     * 心跳超时时间，至少为heartbeat的两倍
+     */
     private int heartbeatTimeout;
     private AtomicBoolean closed = new AtomicBoolean(false);
 

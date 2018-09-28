@@ -22,6 +22,9 @@ import org.apache.dubbo.remoting.Dispatcher;
 
 /**
  * default thread pool configure
+ * 所有的消息都派发到线程池，包括请求、响应、连接事件、断开事件、心跳等。
+ *
+ * 事件派发类继承图分两个维度，Dispatcher（事件派发器）、与之对应的ChannelHandler,例如AllChannelHandler。
  */
 public class AllDispatcher implements Dispatcher {
 
