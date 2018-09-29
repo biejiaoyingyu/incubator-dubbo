@@ -44,21 +44,45 @@ import java.io.InputStream;
 /**
  * ExchangeCodec.
  *
- *
- *
+ * 交互层编码器，其他具体协议的基础类，可以看出是业务协议的模板类
+ * 包含Dubbo协议的模板实现类
  */
 public class ExchangeCodec extends TelnetCodec {
 
     // header length.
+    /**
+     * 协议头部长度，共16个字节
+     */
     protected static final int HEADER_LENGTH = 16;
     // magic header.
+    /**
+     * 魔数，固定为0xdabb，2个字节。
+     */
     protected static final short MAGIC = (short) 0xdabb;
+    /**
+     * 魔数的高8位。
+     */
     protected static final byte MAGIC_HIGH = Bytes.short2bytes(MAGIC)[0];
+    /**
+     * 魔数的低8位。
+     */
     protected static final byte MAGIC_LOW = Bytes.short2bytes(MAGIC)[1];
     // message flag.
+    /**
+     * 消息请求类型为消息请求。
+     */
     protected static final byte FLAG_REQUEST = (byte) 0x80;
+    /**
+     * 消息请求类型为心跳。
+     */
     protected static final byte FLAG_TWOWAY = (byte) 0x40;
+    /**
+     * 消息请求类型为事件。
+     */
     protected static final byte FLAG_EVENT = (byte) 0x20;
+    /**
+     * serialization掩码。
+     */
     protected static final int SERIALIZATION_MASK = 0x1f;
     private static final Logger logger = LoggerFactory.getLogger(ExchangeCodec.class);
 
@@ -66,13 +90,30 @@ public class ExchangeCodec extends TelnetCodec {
         return MAGIC;
     }
 
+    /**
+     * 编码实现原理
+     * @param channel  Dubbo网络通道的抽象,底层实现有NettyChannel、MinaChannel
+     * @param buffer buffer抽象类，屏蔽netty,mina等底层实现差别
+     * @param msg 请求对象、响应对象或其他消息对象。
+     * @throws IOException
+     */
     @Override
     public void encode(Channel channel, ChannelBuffer buffer, Object msg) throws IOException {
+
         if (msg instanceof Request) {
+            /**
+             * 如果msg是Request，则按照请求对象协议编码。
+             */
             encodeRequest(channel, buffer, (Request) msg);
         } else if (msg instanceof Response) {
+            /**
+             * 如果是响应对象，则按照响应协议编码。
+             */
             encodeResponse(channel, buffer, (Response) msg);
         } else {
+            /**
+             * 如果是业务类对象（请求、响应），则使用父类默认的编码方式。
+             */
             super.encode(channel, buffer, msg);
         }
     }
@@ -208,27 +249,84 @@ public class ExchangeCodec extends TelnetCodec {
         return req.getData();
     }
 
+    /**
+     *
+     * @param channel
+     * @param buffer
+     * @param req
+     * @throws IOException
+     */
     protected void encodeRequest(Channel channel, ChannelBuffer buffer, Request req) throws IOException {
+        /**
+         * 初始化协议头，同时填充部分字段。header[0]、header[1]、header[2]、header[4-11]，注意,header[3]未填充。
+         */
+        /**
+         * 获取通道的序列化实现类。
+         */
         Serialization serialization = getSerialization(channel);
         // header.
+        /**
+         * 构建请求头部,header数组，长度为16个字节。
+         */
         byte[] header = new byte[HEADER_LENGTH];
         // set magic number.
+        /**
+         * 首先填充头部的前两个字节，协议的魔数。header[0] = 魔数的高8个字节，header[1] = 魔数的低8个字节。
+         */
         Bytes.short2bytes(MAGIC, header);
-
         // set request and serialization flag.
+        /**
+         * 头部的第3个字节存储的是消息请求标识与序列化器类别，那这8位是如何存储的呢？
+         *
+         *
+         * 首先看一下消息请求标志的定义：
+               protected static final byte FLAG_REQUEST = (byte) 0x80;      // 其二进制为 1000 0000
+               protected static final byte FLAG_TWOWAY = (byte) 0x40;       // 其二进制为 0100 0000
+               protected static final byte FLAG_EVENT = (byte) 0x20;           // 其二进制为 0010 0000
+               protected static final int SERIALIZATION_MASK = 0x1f;          // 其序列化的掩码，为什么是这样的呢？
+               serialization.getContentTypeId() 返回的类型如下：
+               CompactedJavaSerialization:4     二进制为0000 0010
+               FastJsonSerialization:6     二进制为0000 0110
+               FstSerialization:9     二进制为0000 1001
+               Hessian2Serialization:2     二进制为0000  0010
+               JavaSerialization:3     二进制为0000 0011
+               KryoSerialization:8    二进制为0000 1000
+               NativeJavaSerialization：7     二进制为0000 0111
+               结合代码header[2] =  (byte) (FLAG_REQUEST | serialization.getContentTypeId())
+               可以得出一个结论,header[2]为8字节标志位，前4位，表示消息请求类型，依次为：请求、twoway、event，保留位。后4为：
+               序列化的类型，也就是说dubbo协议只支持16中序列化协议。
+         */
         header[2] = (byte) (FLAG_REQUEST | serialization.getContentTypeId());
+
 
         if (req.isTwoWay()) header[2] |= FLAG_TWOWAY;
         if (req.isEvent()) header[2] |= FLAG_EVENT;
 
         // set request id.
+        /**
+         * head[4]- head[11] 共8个字节为请求ID。Dubbo传输使用大端字节序列，也就说在接受端，首先读到的字节是高位字节。
+         */
         Bytes.long2bytes(req.getId(), header, 4);
 
         // encode request data.
+        /**
+         * 编码请求体（body），协议的设计，一般是基于 请求头部+请求体构成。
+         */
         int savedWriteIndex = buffer.writerIndex();
         buffer.writerIndex(savedWriteIndex + HEADER_LENGTH);
+        /**
+         * 对buffer做一个简单封装，返回ChannelBufferOutputStream实例。
+         */
         ChannelBufferOutputStream bos = new ChannelBufferOutputStream(buffer);
+        /**
+         * 根据序列化器，将通道的URL进行序列化，变存入buffer中。
+         */
         ObjectOutput out = serialization.serialize(channel.getUrl(), bos);
+
+        /**
+         * 根据请求类型，事件或请求对Request.getData()请求体进行编码，encodeEventData、encodeRequestData
+         * 不同的编码器会重写该方法。
+         */
         if (req.isEvent()) {
             encodeEventData(channel, out, req.getData());
         } else {
@@ -240,8 +338,14 @@ public class ExchangeCodec extends TelnetCodec {
         }
         bos.flush();
         bos.close();
+        /**
+         * 最后得到bos的总长度，该长度等于 (header+body)的总长度，也就是一个完整请求包的长度。
+         */
         int len = bos.writtenBytes();
         checkPayload(channel, len);
+        /**
+         * 将包总长度写入到header的header[12-15]中。
+         */
         Bytes.int2bytes(len, header, 12);
 
         // write

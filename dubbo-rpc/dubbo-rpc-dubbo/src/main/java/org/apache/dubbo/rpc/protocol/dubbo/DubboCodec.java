@@ -46,6 +46,10 @@ import static org.apache.dubbo.rpc.protocol.dubbo.CallbackServiceCodec.encodeInv
 
 /**
  * Dubbo codec.
+ *
+ * dubbo协议
+ *
+ *
  */
 public class DubboCodec extends ExchangeCodec implements Codec2 {
 
@@ -174,6 +178,15 @@ public class DubboCodec extends ExchangeCodec implements Codec2 {
         encodeResponseData(channel, out, data, DUBBO_VERSION);
     }
 
+    /**
+     * 该方法，依次将 dubbo、服务path（interface name）、版本号、方法名、方法参数类型描述，参数值、附加属性（例如参数回调等，
+     * 该部分会在服务调用相关章节重点分析）。上述内容，根据不同的序列化实现，其组织方式不同，当然，其基本组织方式（标记位、长度 、 具体内容）
+     * @param channel
+     * @param out
+     * @param data
+     * @param version
+     * @throws IOException
+     */
     @Override
     protected void encodeRequestData(Channel channel, ObjectOutput out, Object data, String version) throws IOException {
         RpcInvocation inv = (RpcInvocation) data;
@@ -192,6 +205,15 @@ public class DubboCodec extends ExchangeCodec implements Codec2 {
         out.writeObject(RpcUtils.getNecessaryAttachments(inv));
     }
 
+    /**
+     * 1字节（请求结果），取值：RESPONSE_NULL_VALUE：表示空结果；RESPONSE_WITH_EXCEPTION：表示异常，RESPONSE_VALUE：
+     * 正常响应。N字节的请求响应，使用readObject读取即可
+     * @param channel
+     * @param out
+     * @param data
+     * @param version
+     * @throws IOException
+     */
     @Override
     protected void encodeResponseData(Channel channel, ObjectOutput out, Object data, String version) throws IOException {
         Result result = (Result) data;

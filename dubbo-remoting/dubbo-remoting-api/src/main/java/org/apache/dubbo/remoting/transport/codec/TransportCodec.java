@@ -32,6 +32,7 @@ import java.io.OutputStream;
 
 /**
  * TransportCodec
+ * 传输编码解码器，Codec2的具体实现类。
  */
 public class TransportCodec extends AbstractCodec {
 

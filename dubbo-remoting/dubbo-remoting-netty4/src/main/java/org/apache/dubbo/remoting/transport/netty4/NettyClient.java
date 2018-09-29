@@ -45,20 +45,49 @@ public class NettyClient extends AbstractClient {
 
     private static final Logger logger = LoggerFactory.getLogger(NettyClient.class);
 
+    /**
+     * IO线程组，同一个JVM中所有的客户端公用一个IO线程组，且线程数固定为(32与CPU核数+1的最小值)。
+     */
     private static final NioEventLoopGroup nioEventLoopGroup = new NioEventLoopGroup(Constants.DEFAULT_IO_THREADS, new DefaultThreadFactory("NettyClientWorker", true));
 
+    /**
+     * Netty客户端启动实例。
+     */
     private Bootstrap bootstrap;
 
+    /**
+     * 客户端连接，请copy其引用使用。
+     */
     private volatile Channel channel; // volatile, please copy reference to use
 
+    /**
+     *
+     * @param url  服务提供者URL
+     * @param handler ChannelHandler handler：事件处理器。
+     * @throws RemotingException
+     */
     public NettyClient(final URL url, final ChannelHandler handler) throws RemotingException {
+        /**
+         * wrapChannelHandler在讲解NettyServer时已重点分析，构造其事件转发模型(Dispatch)。
+         */
         super(url, wrapChannelHandler(url, handler));
     }
 
     @Override
     protected void doOpen() throws Throwable {
+
+        /**
+         * 创建NettyClientHandler。
+         */
         final NettyClientHandler nettyClientHandler = new NettyClientHandler(getUrl(), this);
+
+        /**
+         * 创建Netty客户端启动实例bootstrap.
+         */
         bootstrap = new Bootstrap();
+        /**
+         * 客户端绑定IO线程组（池），注意，一个JVM中所有的NettyClient共享其IO线程。
+         */
         bootstrap.group(nioEventLoopGroup)
                 .option(ChannelOption.SO_KEEPALIVE, true)
                 .option(ChannelOption.TCP_NODELAY, true)
@@ -66,12 +95,18 @@ public class NettyClient extends AbstractClient {
                 //.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, getTimeout())
                 .channel(NioSocketChannel.class);
 
+        /**
+         * 设置连接超时时间，最小连接超时时间为3s。
+         */
         if (getTimeout() < 3000) {
             bootstrap.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 3000);
         } else {
             bootstrap.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, getTimeout());
         }
 
+        /**
+         * 设置编码器、事件连接器，当触发事件后，将调用nettyClientHandler中相关的方法。
+         */
         bootstrap.handler(new ChannelInitializer() {
 
             @Override
@@ -88,8 +123,15 @@ public class NettyClient extends AbstractClient {
     @Override
     protected void doConnect() throws Throwable {
         long start = System.currentTimeMillis();
+        /**
+         * 调用bootstrap.connect方法发起TCP连接。
+         */
         ChannelFuture future = bootstrap.connect(getConnectAddress());
         try {
+
+            /**
+             * future.awaitUninterruptibly，连接事件只等待3S，这里写成固定了，显然没有与doOpen方法中ChannelOption.CONNECT_TIMEOUT_MILLIS保持一致。
+             */
             boolean ret = future.awaitUninterruptibly(3000, TimeUnit.MILLISECONDS);
 
             if (ret && future.isSuccess()) {
