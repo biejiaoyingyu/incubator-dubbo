@@ -120,15 +120,41 @@ public class ExchangeCodec extends TelnetCodec {
 
     @Override
     public Object decode(Channel channel, ChannelBuffer buffer) throws IOException {
+
+
         int readable = buffer.readableBytes();
+        /**
+         * 创建一个byte数组，其长度为 头部长度和可读字节数取最小值。
+         */
         byte[] header = new byte[Math.min(readable, HEADER_LENGTH)];
+        /**
+         * 读取指定字节到header中。
+         */
         buffer.readBytes(header);
+        /**
+         * 调用decode方法尝试解码。
+         */
         return decode(channel, buffer, readable, header);
     }
 
+    /**
+     *
+     * @param channel 网络通道
+     * @param buffer 通道读缓存区
+     * @param readable 可读字节数。
+     * @param header 已读字节数，（尝试读取一个完整头部）
+     * @return
+     * @throws IOException
+     */
     @Override
     protected Object decode(Channel channel, ChannelBuffer buffer, int readable, byte[] header) throws IOException {
         // check magic number.
+        /**
+         * 检查魔数，判断是否是dubbo协议，如果不是dubbo协议，则调用父类的解码方法，例如telnet协议。
+         * 如果至少读取到一个字节，如果第一个字节与魔数的高位字节不相等或至少读取了两个字节，并且第二个字节与
+         * 魔数的地位字节不相等，则认为不是   dubbo协议，则调用父类的解码方法,如果是其他协议的化，将剩余的可
+         * 读字节从通道中读出，提交其父类解码。
+         */
         if (readable > 0 && header[0] != MAGIC_HIGH
                 || readable > 1 && header[1] != MAGIC_LOW) {
             int length = header.length;
@@ -146,11 +172,19 @@ public class ExchangeCodec extends TelnetCodec {
             return super.decode(channel, buffer, readable, header);
         }
         // check length.
+        /**
+         * 如果是dubbo协议，判断可读字节的长度是否大于协议头部的长度，如果可读字节小于头部字节，
+         * 则跳过本次读事件处理，待读缓存区中更多的数据到达。
+         */
         if (readable < HEADER_LENGTH) {
             return DecodeResult.NEED_MORE_INPUT;
         }
 
         // get data length.
+        /**
+         * 如果读取到一个完整的协议头，然后读取消息体长度，如果当前可读自己小于消息体+header的长
+         * 度，返回NEED_MORE_INPUT,表示放弃本次解码，待更多数据到达缓冲区时再解码。
+         */
         int len = Bytes.bytes2int(header, 12);
         checkPayload(channel, len);
 
@@ -160,9 +194,15 @@ public class ExchangeCodec extends TelnetCodec {
         }
 
         // limit input stream.
+        /**
+         * 创建一个ChannelBufferInputStream，并限制最多只读取len长度的字节。
+         */
         ChannelBufferInputStream is = new ChannelBufferInputStream(buffer, len);
 
         try {
+            /**
+             * 调用decodeBody方法解码协议体。
+             */
             return decodeBody(channel, is, header);
         } finally {
             if (is.available() > 0) {
@@ -170,6 +210,11 @@ public class ExchangeCodec extends TelnetCodec {
                     if (logger.isWarnEnabled()) {
                         logger.warn("Skip input stream " + is.available());
                     }
+                    /**
+                     * 如果本次并未读取len个字节，则跳过这些字节，保证下一个包从正确的位置开始处理。
+                     * 这个其实就是典型的网络编程（自定义协议）的解码实现。由于本文只关注Dubbo协议的
+                     * 解码，故decodeBody方法的实现，请看DubboCodec#decodeBody。
+                     */
                     StreamUtils.skipUnusedStream(is);
                 } catch (IOException e) {
                     logger.warn(e.getMessage(), e);
@@ -178,15 +223,21 @@ public class ExchangeCodec extends TelnetCodec {
         }
     }
 
+
     protected Object decodeBody(Channel channel, InputStream is, byte[] header) throws IOException {
+
         byte flag = header[2], proto = (byte) (flag & SERIALIZATION_MASK);
         Serialization s = CodecSupport.getSerialization(channel.getUrl(), proto);
         ObjectInput in = s.deserialize(channel.getUrl(), is);
         // get request id.
         long id = Bytes.bytes2long(header, 4);
+
+
         if ((flag & FLAG_REQUEST) == 0) {
             // decode response.
+
             Response res = new Response(id);
+
             if ((flag & FLAG_EVENT) != 0) {
                 res.setEvent(Response.HEARTBEAT_EVENT);
             }
@@ -196,6 +247,7 @@ public class ExchangeCodec extends TelnetCodec {
             if (status == Response.OK) {
                 try {
                     Object data;
+
                     if (res.isHeartbeat()) {
                         data = decodeHeartbeatData(channel, in);
                     } else if (res.isEvent()) {

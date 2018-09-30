@@ -67,35 +67,60 @@ public class DubboCodec extends ExchangeCodec implements Codec2 {
 
     @Override
     protected Object decodeBody(Channel channel, InputStream is, byte[] header) throws IOException {
+        /**
+         * 根据协议头获取标记为(header[2])（根据协议可知，包含请求类型、序列化器）。
+         */
         byte flag = header[2], proto = (byte) (flag & SERIALIZATION_MASK);
         Serialization s = CodecSupport.getSerialization(channel.getUrl(), proto);
         // get request id.
         long id = Bytes.bytes2long(header, 4);
+        /**
+         * 解码响应消息请求体。
+         */
+        /**
+         * 根据flag标记相应标记为，如果与FLAG_REQUEST进行逻辑与操作，为0说明不是请求类型，那对应的就是响应数据包。
+         */
         if ((flag & FLAG_REQUEST) == 0) {
             // decode response.
+            /**
+             * 根据请求ID，构建响应结果。
+             */
             Response res = new Response(id);
+            /**
+             * 如果是事件类型。
+             */
             if ((flag & FLAG_EVENT) != 0) {
                 res.setEvent(Response.HEARTBEAT_EVENT);
             }
             // get status.
+            /**
+             * 获取响应状态码。
+             */
             byte status = header[3];
             res.setStatus(status);
             if (status == Response.OK) {
                 try {
                     Object data;
                     if (res.isHeartbeat()) {
+                        /**
+                         * 如果是心跳事件，则直接调用readObject完成解码即可。
+                         */
                         data = decodeHeartbeatData(channel, deserialize(s, channel.getUrl(), is));
                     } else if (res.isEvent()) {
                         data = decodeEventData(channel, deserialize(s, channel.getUrl(), is));
                     } else {
                         DecodeableRpcResult result;
-                        if (channel.getUrl().getParameter(
-                                Constants.DECODE_IN_IO_THREAD_KEY,
-                                Constants.DEFAULT_DECODE_IN_IO_THREAD)) {
-                            result = new DecodeableRpcResult(channel, res, is,
-                                    (Invocation) getRequestData(id), proto);
+                        /**
+                         * 获取decode.in.io的配置值，默认为true，表示在IO线程中解码消息体，
+                         * 如果decode.in.io设置为false,则会在DecodeHanler中执行（受Dispatch事件派发模型影响）。
+                         */
+                        if (channel.getUrl().getParameter(Constants.DECODE_IN_IO_THREAD_KEY, Constants.DEFAULT_DECODE_IN_IO_THREAD)) {
+                            result = new DecodeableRpcResult(channel, res, is, (Invocation) getRequestData(id), proto);
                             result.decode();
                         } else {
+                            /**
+                             * 不在IO线程池中完成解码操作，实现方式也就是不在io线程中调用DecodeableRpcInvocation#decode方法。
+                             */
                             result = new DecodeableRpcResult(channel, res,
                                     new UnsafeByteArrayInputStream(readMessageData(is)),
                                     (Invocation) getRequestData(id), proto);
