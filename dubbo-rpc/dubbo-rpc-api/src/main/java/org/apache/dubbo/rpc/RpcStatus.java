@@ -79,6 +79,10 @@ public class RpcStatus {
     }
 
     /**
+     *
+     * 这里是并发容器ConcurrentHashMap的经典使用，从这里可以看出
+     * ConcurrentMap< String, ConcurrentMap< String, RpcStatus>> METHOD_STATISTICS
+     * 的存储结构为 {  服务提供者URL唯一字符串：{方法名：RpcStatus} }。
      * @param url
      * @param methodName
      * @return status

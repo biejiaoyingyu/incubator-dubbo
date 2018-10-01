@@ -50,6 +50,8 @@ public @interface Activate {
      * @return group names to match
      * @see ExtensionLoader#getActivateExtension(URL, String, String)
      */
+    // 所属组，String[],例如消费端、服务端。
+
     String[] group() default {};
 
     /**
@@ -63,6 +65,7 @@ public @interface Activate {
      * @see ExtensionLoader#getActivateExtension(URL, String)
      * @see ExtensionLoader#getActivateExtension(URL, String, String)
      */
+    //如果指定该值，只有当消费者或服务提供者URL中包含属性名为value的键值对，该过滤器才处于激活状态。
     String[] value() default {};
 
     /**
@@ -71,6 +74,7 @@ public @interface Activate {
      *
      * @return extension list which should be put before the current one
      */
+    //用于指定执行顺序，before指定的过滤器在该过滤器之前执行。
     @Deprecated
     String[] before() default {};
 
@@ -80,6 +84,7 @@ public @interface Activate {
      *
      * @return extension list which should be put after the current one
      */
+    //用于指定执行顺序，after指定的过滤器在该过滤器之后执行。
     @Deprecated
     String[] after() default {};
 
@@ -88,5 +93,6 @@ public @interface Activate {
      *
      * @return absolute ordering info
      */
+    //用户指定顺序，值越小，越先执行。
     int order() default 0;
 }

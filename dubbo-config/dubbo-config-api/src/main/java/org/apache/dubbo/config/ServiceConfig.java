@@ -679,6 +679,12 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                         //获取invoker
                         /**
                          * 通过动态代理机制创建Invoker，dubbo的远程调用实现类。
+                         *
+                         * 根据 首先获取ref的代理对象，真正的服务实现类proxy，然后通过proxyFactory【JavassistProxyFactory、JdkProxyFactory】
+                         * 创建最原始的Invoker，即AbstractProxyInvoker，使用的是匿名实现类，即提供反射方式进行方法的调用。
+                         * 从abstract Object doInvoker(T proxy, String methodName, Class< ? >[] parameterTypes, Object[] arguments)
+                         * 可以最终是通过对象发射方式进行方法调用。
+                         *
                          */
                         Invoker<?> invoker = proxyFactory.getInvoker(ref, (Class) interfaceClass, registryURL.addParameterAndEncoded(Constants.EXPORT_KEY, url.toFullString()));
                         /**
@@ -705,10 +711,32 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                          * registry=com.alibaba.dubbo.registry.integration.RegistryProtocol
                          * //文件位于dubbo-registry-api/src/main/resources/META-INF/dubbo/internal/com.alibaba.dubbo.rpc.Protocol
                          * 代码@7：根据代码@6的分析，将调用RegistryProtocol#export方法。
+                         *
+                         *
+                         * 首先使用DelegateProviderMetaDataInvoker对AbstractProxyInvoker进行包装，主要是将ServerConfig对象与Invoker一起保存。
                          */
 
                         DelegateProviderMetaDataInvoker wrapperInvoker = new DelegateProviderMetaDataInvoker(invoker, this);
                         //根据协议将invoker暴露成exporter，具体过程是创建一个ExchangeServer，它会绑定一个ServerSocket到配置端口
+                        /**
+                         * 根据具体协议对服务端Invoker进行导出（继续包装）。
+                         * registry://127.0.0.1:2181/com.alibaba.dubbo.registry.RegistryService?
+                         * application=demo-provider&
+                         * dubbo=2.0.0&
+                         * export=dubbo%3A%2F%2F192.168.56.1%3A20880%2Fcom.alibaba.dubbo.demo.DemoService%3Fanyhost%3Dtrue%26application%3Ddemo-provider%26bind.ip%3D192.168.56.1%26bind.port%3D20880%26dubbo%3D2.0.0%26generic%3Dfalse%26interface%3Dcom.alibaba.dubbo.demo.DemoService%26methods%3DsayHello%26pid%3D14360%26qos.port%3D22222%26side%3Dprovider%26stub%3Dcom.alibaba.dubbo.demo.provider.DemoServiceStub%26timestamp%3D1533944510702&
+                         * pid=14360&
+                         * qos.port=22222&
+                         * registry=zookeeper&
+                         * timestamp=1533944510687
+                         *
+                         * 协议前缀:registry，故根据SPI机制，具体的协议为RegistryProtocol。
+                         * registry=zookeeper ：代表注册中心使用zookeeper，在连接注册中心时根据该值进行策略选择。
+                         * export= dubbo://…   :  根据export，在服务端按照协议启动对应的服务端程序，该协议注意指定请求包的二进制协议，例如协议头和协议体。
+                         * 按照registry协议，应该会直接调用RegistryProtocol#export，但我们忽略了Dubbo的另一机制，该部分也是在服务提供者启动流程中被遗漏。
+                         * Dubbo为了对服务调用进行包装，采用了过滤器Filter 链模式，在AbstractProxyInvoker调用之前，先执行一系列的过滤器Filter，
+                         * Dubbo协议默认的协议层面的过滤器代理实现为：com.alibaba.dubbo.rpc.protocol.ProtocolListenerWrapper,SPI定义文件见：
+                         * dubbo-rpc-api/src/main/resources/METAINF/dubbo/internal/com.alibaba.dubbo.rpc.Protocol：
+                         */
                         Exporter<?> exporter = protocol.export(wrapperInvoker);
                         //将创建的exporter放进链表便于管理
                         exporters.add(exporter);

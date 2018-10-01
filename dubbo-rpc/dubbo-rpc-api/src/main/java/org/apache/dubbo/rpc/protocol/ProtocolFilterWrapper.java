@@ -52,7 +52,7 @@ public class ProtocolFilterWrapper implements Protocol {
     }
 
     /**
-     *它读取所有的 filter 类，利用这些类封装 invoker
+     * 它读取所有的 filter 类，利用这些类封装 invoker
      * /dubbo-rpc-api/src/main/resources/META-INF/dubbo/internal/com.alibaba.dubbo.rpc.Filter
      * 这其中涉及到很多功能，包括权限验证、异常、超时等等，当然可以预计计算调用时间等
      * 等应该也是在这其中的某个类实现的；
@@ -68,12 +68,18 @@ public class ProtocolFilterWrapper implements Protocol {
     private static <T> Invoker<T> buildInvokerChain(final Invoker<T> invoker, String key, String group) {
         Invoker<T> last = invoker;
         //通过该句获得扩展配置的过滤器列表，具体机制需要研究该类的实现
+        /**
+         * 加载系统配置的所有Filer，并根据作用对象（服务提供者、服务消费者），返回合适的Filter链表。
+         */
         List<Filter> filters = ExtensionLoader.getExtensionLoader(Filter.class).getActivateExtension(invoker.getUrl(), key, group);
         if (!filters.isEmpty()) {
             for (int i = filters.size() - 1; i >= 0; i--) {
                 //循环将过滤器列表组装成为过滤器链，目标invoker是最后一个执行的。
                 final Filter filter = filters.get(i);
                 final Invoker<T> next = last;
+                /**
+                 * 根据Filter构建Invoker链。
+                 */
                 last = new Invoker<T>() {
 
                     @Override
@@ -116,11 +122,20 @@ public class ProtocolFilterWrapper implements Protocol {
         return protocol.getDefaultPort();
     }
 
+
+
     @Override
     public <T> Exporter<T> export(Invoker<T> invoker) throws RpcException {
+        /**
+         * ：如果协议为registry，则直接调用RegistryProtocol#expoert完成协议导出，协议为registry其含义是通过注册中心暴露，
+         * 最终会根据expoert，调用具体的协议进行服务暴露，最终会再次进入该方法。
+         */
         if (Constants.REGISTRY_PROTOCOL.equals(invoker.getUrl().getProtocol())) {
             return protocol.export(invoker);
         }
+        /**
+         * 如果为具体协议，例如dubbo等，则通过buildInvokerChain构建Invoker链。
+         */
         return protocol.export(buildInvokerChain(invoker, Constants.SERVICE_FILTER_KEY, Constants.PROVIDER));
     }
 

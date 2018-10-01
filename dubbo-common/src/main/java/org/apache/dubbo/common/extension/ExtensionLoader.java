@@ -172,14 +172,20 @@ public class ExtensionLoader<T> {
     /**
      * This is equivalent to {@code getActivateExtension(url, url.getParameter(key).split(","), null)}
      *
-     * @param url   url
-     * @param key   url parameter key which used to get extension point names
-     * @param group group
+     * @param url   url  服务提供者或服务消费者url。
+     * @param key   url parameter key which used to get extension point names  过滤器属性key，服务提供者固定为:service.filter，服务消费者固定为reference.filter。
+     * @param group group  服务提供者或服务消费者。
      * @return extension list which are activated.
      * @see #getActivateExtension(org.apache.dubbo.common.URL, String[], String)
      */
     public List<T> getActivateExtension(URL url, String key, String group) {
+        /**
+         * 从url中获取配置的自定义filter。
+         */
         String value = url.getParameter(key);
+        /**
+         * 如果value不为空，则将字符串调用split转换为数组，然后调用getActivateExtension方法，获取符合条件的过滤器。
+         */
         return getActivateExtension(url, value == null || value.length() == 0 ? null : Constants.COMMA_SPLIT_PATTERN.split(value), group);
     }
 
@@ -195,7 +201,13 @@ public class ExtensionLoader<T> {
     public List<T> getActivateExtension(URL url, String[] values, String group) {
         List<T> exts = new ArrayList<T>();
         List<String> names = values == null ? new ArrayList<String>(0) : Arrays.asList(values);
+        /**
+         * 如果配置的service.filter或referecnce.filter包含了-default，表示禁用系统默认提供的一系列过滤器。
+         */
         if (!names.contains(Constants.REMOVE_VALUE_PREFIX + Constants.DEFAULT_KEY)) {
+            /**
+             * 如果不禁用系统默认过滤器链，则首先加载所有默认过滤器。
+             */
             getExtensionClasses();
             for (Map.Entry<String, Object> entry : cachedActivates.entrySet()) {
                 String name = entry.getKey();
@@ -212,11 +224,19 @@ public class ExtensionLoader<T> {
                 } else {
                     continue;
                 }
+                /**
+                 * 根据group刷选出适配的过滤器。
+                 */
                 if (isMatchGroup(group, activateGroup)) {
                     T ext = getExtension(name);
-                    if (!names.contains(name)
-                            && !names.contains(Constants.REMOVE_VALUE_PREFIX + name)
-                            && isActive(activateValue, url)) {
+                    /**
+                     * 也可以对单个filter进行禁用，其方法是-过滤器名称的方式。例如如想禁用AccessLogFilter，则可以通过-accesslog方式禁用。
+                     * -key,key为/dubbo-rpc-api/src/main/resources/META-INF/dubbo/internal/com.alibaba.dubbo.rpc.Filter中定义的key。
+                     * --------------------------------------------------------------------------------------------------
+                     * 判断过滤器是否激活，其逻辑是如果Filter上的@Activate注解value值不为空，则需要判断url中是否包含键为value的属性对，
+                     * 存在则启用，不存在则不启用。
+                     */
+                    if (!names.contains(name) && !names.contains(Constants.REMOVE_VALUE_PREFIX + name) && isActive(activateValue, url)) {
                         exts.add(ext);
                     }
                 }
@@ -224,6 +244,11 @@ public class ExtensionLoader<T> {
             Collections.sort(exts, ActivateComparator.COMPARATOR);
         }
         List<T> usrs = new ArrayList<T>();
+        /**
+         * 加载用户自定义的Filter，也即是service.filter或reference.filter指定的过滤器。
+         *
+         * ====>如果需要自定过滤器，需要在自定的工程中META-INF/dubbo/internal/com.alibaba.dubbo.rpc.Filter文件中注册。
+         */
         for (int i = 0; i < names.size(); i++) {
             String name = names.get(i);
             if (!name.startsWith(Constants.REMOVE_VALUE_PREFIX)

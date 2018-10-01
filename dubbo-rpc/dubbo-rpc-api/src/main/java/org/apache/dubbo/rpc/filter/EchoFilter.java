@@ -27,6 +27,18 @@ import org.apache.dubbo.rpc.RpcResult;
 
 /**
  * EchoInvokerFilter
+ * 实现com.alibaba.dubbo.rpc.Filter接口。
+ *  除了支持默认的过滤器外，Dubbo还支持自定义Filter，可以通过service.filter指定过滤器，多个用英文逗号隔开，其配置方法为：
+ *   < dubbo:service ……>
+ *      < dubbo:parameter key = “service.filter” value = “filter1,filer2,…”/>
+ *   < /dubbo:service>
+ *   当然，可以为所有服务提供者设置共用过滤器，其指定方法为：
+ *   < dubbo:provider …>
+ *      < dubbo:parameter key = “service.filter” value = “filter1,filer2,…”/>
+ *   < /dubbo:provider>
+ *   消费端自定义过滤器的key为reference.filter，其使用方法在< dubbo:reference/>标签或< dubbo:consumer/>标签下定义属性。
+ *   关于自定义Filter的解析代码如下：
+ *   ExtensionLoader#getActivateExtension
  */
 @Activate(group = Constants.PROVIDER, order = -110000)
 public class EchoFilter implements Filter {

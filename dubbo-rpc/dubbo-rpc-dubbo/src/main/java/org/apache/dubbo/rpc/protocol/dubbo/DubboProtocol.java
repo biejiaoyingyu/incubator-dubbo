@@ -80,7 +80,13 @@ public class DubboProtocol extends AbstractProtocol {
         @Override
         public CompletableFuture<Object> reply(ExchangeChannel channel, Object message) throws RemotingException {
             if (message instanceof Invocation) {
+                /**
+                 * 获取服务调用信息，例如调用服务类名(interface)、服务方法名、参数类型，参数值。
+                 */
                 Invocation inv = (Invocation) message;
+                /**
+                 * 获取调用者Invoker。
+                 */
                 Invoker<?> invoker = getInvoker(channel, inv);
                 // need to consider backward-compatibility if it's a callback
                 if (Boolean.TRUE.toString().equals(inv.getAttachments().get(IS_CALLBACK_SERVICE_INVOKE))) {
@@ -112,6 +118,9 @@ public class DubboProtocol extends AbstractProtocol {
                     rpcContext.setAsyncContext(new AsyncContextImpl(future));
                 }
                 rpcContext.setRemoteAddress(channel.getRemoteAddress());
+                /**
+                 * 调用Invoker，执行具体的方法调用。
+                 */
                 Result result = invoker.invoke(inv);
 
                 if (result instanceof AsyncRpcResult) {
@@ -125,6 +134,13 @@ public class DubboProtocol extends AbstractProtocol {
                     + ", channel: consumer: " + channel.getRemoteAddress() + " --> provider: " + channel.getLocalAddress());
         }
 
+
+        /**
+         * 如果是服务调用，就进入到reply方法中，否则调用父类进行请求响应。
+         * @param channel
+         * @param message
+         * @throws RemotingException
+         */
         @Override
         public void received(Channel channel, Object message) throws RemotingException {
             if (message instanceof Invocation) {

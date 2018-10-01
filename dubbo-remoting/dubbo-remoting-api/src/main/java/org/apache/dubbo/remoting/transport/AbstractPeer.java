@@ -30,6 +30,22 @@ public abstract class AbstractPeer implements Endpoint, ChannelHandler {
 
     /**
      *  事件处理Handler
+     *
+     *  ???----------->
+     *  那AbstractPeer中的ChannelHandler又是“何许人也”，
+     *  是通过调用NettyServer(URL url, ChannelHandler handler)中传入的，结合上图中NettyServer的构建流程，可以追溯其流程如下：
+     *
+     * 1. DubboProtocol#createServer
+     *    server = Exchangers.bind(url, requestHandler);       // @1, requestHandler，为最原始的ChannelHandler，接下来整个过程都是对该handler的包装。
+     * 2. HeaderExchanger#bind
+     *    return new HeaderExchangeServer(Transporters.bind(url, newDecodeHandler(new HeaderExchangeHandler(handler))));
+     *    其包装顺序为 DecodeHandler -->HeaderExchangeHandler -->(DubboProtocol#requestHandler)
+     * 3. NettyTransporter#bind
+     * 4. NettyServer构造函数
+     *    super(url, ChannelHandlers.wrap(handler, ExecutorUtil.setThreadName(url, SERVER_THREAD_POOL_NAME)));
+     *    这里主要包装的是事件的派发Handler，例如AllChannelHandler、ExecutionChannelHandler【Dispatch】业务Handler最终的包装顺序为：
+     *    事件派发模型handler[AllChannelHandler] -->DecodeHandler-->HeaderExchangeHandler--> DubboProtocol#requestHandler(最终的业务Handler)。结合网络Netty的处理Handler，服务端事件Handler的处理为：DubboCodec2(解码器)
+     *    --> 事件派发模型handler[AllChannelHandler]-->DecodeHandler--> HeaderExchangeHandler--> DubboProtocol#requestHandler(最终的业务Handler)。
      */
     private final ChannelHandler handler;
 

@@ -101,6 +101,14 @@ final class HeaderExchangeChannel implements ExchangeChannel {
         return request(request, channel.getUrl().getPositiveParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT));
     }
 
+    /**
+     * 这里是通过Future模式来实现异步调用的，同步调用也是通过异步调用来实现，只是同步调用发起后，
+     * 直接调用future#get的方法来同步等待结果的返回，而异步调用只返回Future Response，在用户需要关心其结果时才调用get方法。
+     * @param request
+     * @param timeout
+     * @return
+     * @throws RemotingException
+     */
     @Override
     public ResponseFuture request(Object request, int timeout) throws RemotingException {
         if (closed) {

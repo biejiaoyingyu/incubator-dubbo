@@ -37,30 +37,59 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * DubboMonitor
+ * Dubbo中默认的Monitor监控实现类为DubboMonitor
  */
 public class DubboMonitor implements Monitor {
 
     private static final Logger logger = LoggerFactory.getLogger(DubboMonitor.class);
 
     private static final int LENGTH = 10;
-
+    /**
+     * 定时调度线程池，使用3个线程的线程池，线程名称以DubboMonitorSendTimer。
+     */
     private final ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(3, new NamedThreadFactory("DubboMonitorSendTimer", true));
 
+    /**
+     * 调度任务future。
+     */
     private final ScheduledFuture<?> sendFuture;
 
+    /**
+     * 监控调度Invoker，Dubbo中的监控中心会作为服务提供者暴露服务，服务提供者，服务消费者
+     * 可以通过注册中心订阅服务，通过该Invoker向监控中心汇报调用统计数据，也就是一次上报就
+     * 是一次Dubbo RPC服务调用，其实现类为DubboInvoker，也就是可以通过该Invoker使用dubbo
+     * 协议调用远程Monitor服务。
+     */
     private final Invoker<MonitorService> monitorInvoker;
-
+    /**
+     * 对monitorInvoker的proxy代理，主要是对toString、hashcode、equals无需通过RPC向
+     * MonitorServer服务提供者发起调用。主要是通过AbstractProxyFactory#getProxy创建，
+     * 默认子类为JavassistProxyFactory，动态代理的InvokerHandler为：
+     * com.alibaba.dubbo.rpc.proxy.InvokerInvocationHandler#invoke。
+     */
     private final MonitorService monitorService;
 
+    /**
+     * 向监控中心汇报的频率，也就是调用MonitorService RPC服务的调用频率，默认为1分钟。
+     */
     private final long monitorInterval;
 
+    /**
+     * 统计信息Map。
+     */
     private final ConcurrentMap<Statistics, AtomicReference<long[]>> statisticsMap = new ConcurrentHashMap<Statistics, AtomicReference<long[]>>();
 
     public DubboMonitor(Invoker<MonitorService> monitorInvoker, MonitorService monitorService) {
         this.monitorInvoker = monitorInvoker;
         this.monitorService = monitorService;
+        /**
+         * 从url参数中获取interval属性，如果为空，默认为60000，代表60S。
+         */
         this.monitorInterval = monitorInvoker.getUrl().getPositiveParameter("interval", 60000);
         // collect timer for collecting statistics data
+        /**
+         * 启动定时调度任务，默认60S的间隔执行send()方法，向监控中心汇报服务调用统计数据。
+         */
         sendFuture = scheduledExecutorService.scheduleWithFixedDelay(new Runnable() {
             @Override
             public void run() {
@@ -135,6 +164,20 @@ public class DubboMonitor implements Monitor {
         }
     }
 
+    /**
+     *  收集的信息主要是10个字段
+           update[0] ：调用成功的次数
+           update[1] ：调用失败的次数
+           update[2] ：总调用流量（请求包的总大小）。
+           update[3] ：总响应流量（响应包的总大小）。
+           update[4] ：总响应时长（总服务调用开销）。
+           update[5] ：一次收集周期的平均TPS。
+           update[6] ：最大请求包大小。
+           update[7] ：最大响应包大小。
+           update[8] ：最大响应时间。
+           update[9] ：最大TPS。
+     * @param url
+     */
     @Override
     public void collect(URL url) {
         // data to collect from url

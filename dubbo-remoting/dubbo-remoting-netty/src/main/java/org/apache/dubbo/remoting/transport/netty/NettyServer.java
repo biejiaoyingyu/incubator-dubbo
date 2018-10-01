@@ -118,6 +118,13 @@ public class NettyServer extends AbstractServer implements Server {
                 if (idleTimeout > 10000) {
                     pipeline.addLast("timer", new IdleStateHandler(timer, idleTimeout / 1000, 0, 0));
                 }*/
+
+                /**
+                 * 可以看出，传入Netty框架的事件处理Handler主要是3个：1、解码器；2、编码器；3、业务类NettyHandler。
+                 * 也就是说当服务端(Server)的读事件就绪后，进行网络读写后，会将二进制流传入解码器(Decoder)，解码出一个一
+                 * 个的RPC请求，然后针对每一个RPC请求，交给NettyHandler相关事件处理方法去处理，在这里传入NettyHandler的
+                 * ChannelHandler为NettyServer,以网络读命令为例，最终将调用NettyServer的父类AbstractPeer的received方法
+                 */
                 pipeline.addLast("decoder", adapter.getDecoder());
                 pipeline.addLast("encoder", adapter.getEncoder());
                 pipeline.addLast("handler", nettyHandler);//@2

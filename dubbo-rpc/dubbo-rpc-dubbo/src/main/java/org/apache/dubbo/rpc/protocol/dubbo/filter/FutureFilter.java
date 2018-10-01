@@ -33,6 +33,7 @@ import java.lang.reflect.Method;
 
 /**
  * EventFilter
+ * 引入特定的过滤器FutureFilter来处理异步调用相关的逻辑，group=CONSUMER说明该过滤器属于消费端过滤器。
  */
 @Activate(group = Constants.CONSUMER)
 public class FutureFilter implements PostProcessFilter {
@@ -41,15 +42,28 @@ public class FutureFilter implements PostProcessFilter {
 
     @Override
     public Result invoke(final Invoker<?> invoker, final Invocation invocation) throws RpcException {
+        /**
+         * 同步调用oninvoke事件,执行invoke方法之前的事件。
+         */
         fireInvokeCallback(invoker, invocation);
         // need to configure if there's return value before the invocation in order to help invoker to judge if it's
         // necessary to return future.
+        /**
+         * invoker.invoke(invocation)
+         * 继续沿着调用链调用,最终会到具体的协议Invoker，例如DubboInvoker，发生具体的服务调用，跟踪一下同步、异步调用的实现细节。
+         *
+         * 以DubboInvoke为例
+         */
         return postProcessResult(invoker.invoke(invocation), invoker, invocation);
     }
 
     @Override
     public Result postProcessResult(Result result, Invoker<?> invoker, Invocation invocation) {
+
         if (result instanceof AsyncRpcResult) {
+            /**
+             * 如果调用方式是异步模式，则异步调用onreturn或onthrow事件。
+             */
             AsyncRpcResult asyncResult = (AsyncRpcResult) result;
             asyncResult.thenApplyWithContext(r -> {
                 asyncCallback(invoker, invocation, r);
@@ -57,6 +71,9 @@ public class FutureFilter implements PostProcessFilter {
             });
             return asyncResult;
         } else {
+            /**
+             * 如果调用方式是同步模式，则同步调用onreturn或onthrow事件。
+             */
             syncCallback(invoker, invocation, result);
             return result;
         }
@@ -79,9 +96,22 @@ public class FutureFilter implements PostProcessFilter {
     }
 
     private void fireInvokeCallback(final Invoker<?> invoker, final Invocation invocation) {
+        /**
+         * StaticContext.getSystemContext()中根据key:serviceKey + “.” + method + “.” + “oninvoke.method”
+         * 获取配置的oninvoke.method方法名。
+         * 其中serviceKey为[group]/interface:[version]，其中group与version可能为空，忽略。
+         */
         final Method onInvokeMethod = (Method) StaticContext.getSystemContext().get(StaticContext.getKey(invoker.getUrl(), invocation.getMethodName(), Constants.ON_INVOKE_METHOD_KEY));
+        /**
+         * 同样根据key:serviceKey + “.” + method + “.” + “oninvoke.instance” 从StaticContext.getSystemContext()
+         * 获取oninvoke.method方法所在的实例名对象，
+         * 也就是说该调用哪个对象的oninvoke.method指定的方法。这里就有一个疑问，这些数据是在什么时候存入StaticContext中的呢？
+         */
         final Object onInvokeInst = StaticContext.getSystemContext().get(StaticContext.getKey(invoker.getUrl(), invocation.getMethodName(), Constants.ON_INVOKE_INSTANCE_KEY));
 
+        /**
+         * 主要检测< dubbo:method oninvoke=”“/>配置的正确性，其正确的配置方式如下：“实例名.方法名”，例如：
+         */
         if (onInvokeMethod == null && onInvokeInst == null) {
             return;
         }
@@ -94,8 +124,21 @@ public class FutureFilter implements PostProcessFilter {
 
         Object[] params = invocation.getArguments();
         try {
+            /**
+             * 根据发射机制，调用oninvoke中指定的实例的指定方法，注意，这里传入的参数为调用远程RPC服务的参数。
+             */
             onInvokeMethod.invoke(onInvokeInst, params);
+
+            /**
+             * 如果在执行调用前方法(oninvoke)事件方法失败，则会同步调用onthrow中定义的方法（如有定义）。
+             */
         } catch (InvocationTargetException e) {
+            /**
+             *  异步回调与同步回调的区别就是调用onreturn(fireReturnCallback)和onthrow(fireThrowCallback)
+             *  调用的地方不同，如果是同步调用，也就是在完成RPC服务调用后，立即调用相关的回调方法，如果是异步调用
+             *  的话，RPC服务完成后，通过Future模式异步执行。其实关于onreturn、onthrow属性的解析，执行与oninvoker
+             *  属性的解析完全一样，再这里也就不重复介绍了。
+             */
             fireThrowCallback(invoker, invocation, e.getTargetException());
         } catch (Throwable e) {
             fireThrowCallback(invoker, invocation, e);

@@ -81,16 +81,25 @@ public class DubboInvoker<T> extends AbstractInvoker<T> {
             currentClient = clients[index.getAndIncrement() % clients.length];
         }
         try {
+            /**
+             * 首先获取async属性，如果为true表示异步请求，如果配置了return=”false”表示调用模式为oneway，只发调用，不关注其调用结果。
+             */
             boolean isAsync = RpcUtils.isAsync(getUrl(), invocation);
             boolean isAsyncFuture = RpcUtils.isGeneratedFuture(inv) || RpcUtils.isFutureReturnType(inv);
             boolean isOneway = RpcUtils.isOneway(getUrl(), invocation);
             int timeout = getUrl().getMethodParameter(methodName, Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);
             if (isOneway) {
                 boolean isSent = getUrl().getMethodParameter(methodName, Constants.SENT_KEY, false);
+                /**
+                 * 处理oneway的情况。如果设置了sent=true，表示等待网络数据发出才返回，如果sent=false，只是将待发送数据发到IO写缓存区就返回。
+                 */
                 currentClient.send(inv, isSent);
                 RpcContext.getContext().setFuture(null);
                 return new RpcResult();
             } else if (isAsync) {
+                /**
+                 * 处理异步的情况,细看其实都是通过调用网络客户端client的request,最终调用HeaderExchangeChannel#request方法：
+                 */
                 ResponseFuture future = currentClient.request(inv, timeout);
                 // For compatibility
                 FutureAdapter<Object> futureAdapter = new FutureAdapter<>(future);
@@ -105,6 +114,9 @@ public class DubboInvoker<T> extends AbstractInvoker<T> {
                 }
                 return result;
             } else {
+                /**
+                 * 处理异步的情况,细看其实都是通过调用网络客户端client的request,最终调用HeaderExchangeChannel#request方法：
+                 */
                 RpcContext.getContext().setFuture(null);
                 return (Result) currentClient.request(inv, timeout).get();
             }
