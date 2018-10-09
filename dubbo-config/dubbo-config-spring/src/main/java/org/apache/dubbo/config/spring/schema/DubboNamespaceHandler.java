@@ -58,6 +58,22 @@ import org.springframework.beans.factory.xml.NamespaceHandlerSupport;
  * BeanDefinitionParser 的实现类，Spring 提供了默认实现类 NamespaceHandlerSupport 和
  * AbstractSingleBeanDefinitionParser，简单的方式就是去继承这两个类
  *
+ * //		Step1：解析id属性，如果DubboBeanDefinitionParser对象的required属性为true，如果id为空，则根据如下规则构建一个id。
+ //		1）如果name属性不为空，则取name的值，如果已存在，则为 name + 序号,例如  name,name1,name2。
+ //		2）如果name属性为空，如果是dubbo:protocol标签，则取protocol属性，其他的则取interface属性，如果不为空，则取该值，但如果已存在，和name处理相同，在后面追加序号。
+ //		3）如果第二步还未空，则取beanClass的名称，如果已存在，则追加序号。
+ //		Step2：根据不同的标签解析特殊属性。
+ //		1）dubbo:protocol,添加protocol属性(BeanDefinition)。
+ //		2）dubbo:service,添加ref属性。
+ //		3）dubbo:provider，嵌套解析,dubbo:provider标签有两个可选的子标签,dubbo:service、dubbo:parameter,这里需要嵌套解析dubbo:service标签
+ //		知识点：
+ //		dubbo:provider是配置服务提供者的默认参数，在dubbo spring配置文件中可以配置多个dubbo:provider,那dubbo:service标签如何选取一个合适的dubbo:provider作为其默认参数
+ //		呢？有两种办法，其一：将dubbo:service标签直接声明在dubbo:provider方法，其二，在dubbo:service中通过provider属性指定一个provider配置，如果不填，并且存在多个dubbo:provider配置，则会抛出错误。
+ //		provider配置。
+ //		4）dubbo:customer：解析嵌套标签，其原理与dubbo:provider解析一样。
+ //		Step3：解析标签，将属性与值填充到BeanDefinition的propertyValues中。
+
+ *
  * @export
  */
 public class DubboNamespaceHandler extends NamespaceHandlerSupport {
