@@ -157,40 +157,51 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
         //如果没有配置provider
         // <!-- 定义服务提供者默认属性值 -->
         //<dubbo:provider timeout="5000" threadpool="fixed"  threads="100" accepts="1000" token="true"/>
+
         /**
-         *  如果provider为空，说明dubbo:service标签未设置provider属性，如果一个dubbo:provider标签，
-         *  则取该实例，如果存在多个dubbo:provider配置则provider属性不能为空，（那么说明一个服务可以配置一个provider标签么？不能重复）
+         *  如果provider为空，说明dubbo:service标签未设置provider属性，如果只有一个dubbo:provider标签，
+         *  则取该实例，如果存在多个dubbo:provider配置则provider属性不能为空，（开发者手册说明多个取第一个的么？）
          *  否则抛出异常：”Duplicate provider configs”。
          */
         if (getProvider() == null) {
             //获取IOC容器里的所有provider(也即ProviderConfig类么？)
-            Map<String, ProviderConfig> providerConfigMap =
-            applicationContext == null ? null :
-            BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ProviderConfig.class, false, false);
+            Map<String, ProviderConfig> providerConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ProviderConfig.class, false, false);
             if (providerConfigMap != null && providerConfigMap.size() > 0) {
+                //获取protocol配置
                 Map<String, ProtocolConfig> protocolConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ProtocolConfig.class, false, false);
-                if ((protocolConfigMap == null || protocolConfigMap.size() == 0)
-                        && providerConfigMap.size() > 1) { // backward compatibility // 兼容旧版本
+                //如果没有protocol配置，但是有provider配置，不可能没有protocol配置？？？
+                //存在<dubbo:provider/>但不存在<dubbo:protocol/>配置的情况,也就是说旧版本的protocol配置需要从provider中提取
+                if ((protocolConfigMap == null || protocolConfigMap.size() == 0) && providerConfigMap.size() > 1) {
+                    // backward compatibility // 兼容旧版本
                     List<ProviderConfig> providerConfigs = new ArrayList<ProviderConfig>();
                     for (ProviderConfig config : providerConfigMap.values()) {
+                        // 当<dubbo:provider  default="true"/>时，providerConfigs才会加入
                         if (config.isDefault() != null && config.isDefault()) {
                             providerConfigs.add(config);
                         }
                     }
                     //关联所有providers
+                    //在配置provider的同时，也从默认的<dubbo:provider/>中提取protocol的配置
                     if (!providerConfigs.isEmpty()) {
                         setProviders(providerConfigs);
                     }
                 } else {
+                    //到这里说明没有配置service标签中provider属性，那么需要从provider标签中获取一个，这里显示如果有多个就会报错
+                    //如果某个provider配置包含子node（ServiceBean），且没有明确指定default，也会被当成默认配置么？应该不会
+                    //这个疑问请参看：com\alibaba\dubbo\config\spring\schema\DubboBeanDefinitionParser.java中330行注解
                     ProviderConfig providerConfig = null;
                     for (ProviderConfig config : providerConfigMap.values()) {
+                        //已存在<dubbo:protocol/>配置,则找出默认的<dubbo:provider/>配置
+                        //在这里补充一下什么是默认的<dubbo:provider/>，是指它的default属性为true或者没有配。这个默认配置只能一个。
                         if (config.isDefault() == null || config.isDefault()) {
+                            //是否为默认的provider
                             if (providerConfig != null) {
                                 throw new IllegalStateException("Duplicate provider configs: " + providerConfig + " and " + config);
                             }
                             providerConfig = config;
                         }
                     }
+                    //provider属性可以为空
                     if (providerConfig != null) {
                         setProvider(providerConfig);
                     }
@@ -226,8 +237,7 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
          * 如果ServiceBean的module为空，则尝试从BeanFactory中查询dubbo:module实例，如果存在多个dubbo:module，
          * 则抛出异常：”Duplicate module configs
          */
-        if (getModule() == null
-                && (getProvider() == null || getProvider().getModule() == null)) {
+        if (getModule() == null && (getProvider() == null || getProvider().getModule() == null)) {
             Map<String, ModuleConfig> moduleConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ModuleConfig.class, false, false);
             if (moduleConfigMap != null && moduleConfigMap.size() > 0) {
                 ModuleConfig moduleConfig = null;
@@ -248,10 +258,15 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
         //如果没有配置registries，且没有配置provider
         /**
          * 尝试从BeanFactory中加载所有的注册中心，注意ServiceBean的List registries属性，为注册中心集合。
+         * 1.application标签中有registry属性么？虽然有也不会这样做
+         * 2.下面是3个条件同时满足才会去ioc中寻找，那么说底下3个条件在解析的时候都会解析registry属性
+         * 3.向指定（多个）注册中心注册，那么属性registry=“id1,id2,id3”用逗号隔开，如果不用任何注册中心，可用registry=“N/A‘
+         *
          */
         if ((getRegistries() == null || getRegistries().isEmpty())
                 && (getProvider() == null || getProvider().getRegistries() == null || getProvider().getRegistries().isEmpty())
-                && (getApplication() == null || getApplication().getRegistries() == null || getApplication().getRegistries().isEmpty())) {
+               && (getApplication() == null || getApplication().getRegistries() == null || getApplication().getRegistries().isEmpty())
+                ) {
             Map<String, RegistryConfig> registryConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, RegistryConfig.class, false, false);
             if (registryConfigMap != null && registryConfigMap.size() > 0) {
                 List<RegistryConfig> registryConfigs = new ArrayList<RegistryConfig>();
@@ -313,6 +328,8 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
         }
         //如果没有配置path
         /**
+         * 缺省为接口名（服务路径）？？
+         * 这里id默认为接口名？？？
          * 设置ServiceBean的path属性，path属性存放的是dubbo:service的beanName（dubbo:service id)。
          * <dubbo:service interface="com.yingjun.dubbox.api.UserService" ref="userService" />
          */

@@ -193,7 +193,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
     }
 
     public synchronized void export() {
-        //如果provider没有配置
+        //如果provider属性不为空
         if (provider != null) {
             //如果exporter没有配置使用provider所关联的exporter
             if (export == null) {
@@ -206,7 +206,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         }
         //如果不需要暴露接口则直接返回
         /**
-         * 判断是否暴露服务，由dubbo:service export=”true|false”来指定。
+         * 判断是否暴露服务，由dubbo:service export=”true|false”来指定。配置手册中好像没有这个属性啊？？？
          */
         if (export != null && !export) {
             return;
@@ -216,12 +216,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
          * 如果启用了delay机制，如果delay大于0，表示延迟多少毫秒后暴露服务，使用ScheduledExecutorService延迟调度，最终调用doExport方法
          */
         if (delay != null && delay > 0) {
-            delayExportExecutor.schedule(new Runnable() {
-                @Override
-                public void run() {
-                    doExport();
-                }
-            }, delay, TimeUnit.MILLISECONDS);
+            delayExportExecutor.schedule(()-> doExport(), delay, TimeUnit.MILLISECONDS);
         } else {
             /**
              * 执行具体的暴露逻辑doExport，留意：delay=-1的处理逻辑（基于Spring事件机制触发）
@@ -406,19 +401,28 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
     /**
      * 先遍历ServiceBean的List registries（所有注册中心的配置信息），然后将地址封装成URL对象，
      * 关于注册中心的所有配置属性，最终转换成url的属性(?属性名=属性值)，一个注册中心URL示例：
-     * registry://127.0.0.1:2181/com.alibaba.dubbo.registry.RegistryService?application=demo-provider&dubbo=2.0.0&pid=7072&qos.port=22222&registry=zookeeper&timestamp=1527308268041
+     * registry://127.0.0.1:2181/com.alibaba.dubbo.registry.RegistryService?
+     * application=demo-provider&
+     * dubbo=2.0.0&
+     * pid=7072&
+     * qos.port=22222&
+     * registry=zookeeper&
+     * timestamp=1527308268041
      */
     private void doExportUrls() {
         //将注册的所有url匹配上对应的协议在服务端暴露出来
         /**
          * loadRegistries(true)，
-         * 参数的意思：true，代表服务提供者，false：代表服务消费者，如果是服务提供者，则检测注册中心
-         * 的配置，如果配置了register=”false”，则忽略该地址，如果是服务消费者，并配置了subscribe=”false”
+         * 参数的意思：true，代表服务提供者，
+         * false：代表服务消费者，如果是服务提供者，则检测注册中心的配置，
+         * 如果配置了register=”false”，则忽略该地址，
+         * 如果是服务消费者，并配置了subscribe=”false”
          * 则表示不从该注册中心订阅服务，故也不返回
          */
         List<URL> registryURLs = loadRegistries(true);
         /**
          * 然后遍历配置的所有协议，根据每个协议，向注册中心暴露服务，接下来重点分析doExportUrlsFor1Protocol方法的实现细节。
+         * 那么dobbo支持哪些协议呢？？？
          */
         for (ProtocolConfig protocolConfig : protocols) {
             doExportUrlsFor1Protocol(protocolConfig, registryURLs);
@@ -638,7 +642,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                 exportLocal(url);
             }
             // export to remote if the config is not local (export to local only when config is local)
-            //如果配置不是local则暴露为远程服务.(配置为local，则表示只暴露远程服务)
+            //如果配置不是local则暴露为远程服务.(配置为local，则表示只暴露本地服务)
             /**
              * 如果scope不为local,则将服务暴露在远程。
              */
@@ -654,12 +658,14 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                         /**
                          * 如果dubbo:service的dynamic属性未配置，尝试取dubbo:registry的dynamic属性，该属性的作用是否启用动态注册，如果设置为false，
                          * 服务注册后，其状态显示为disable，需要人工启用，当服务不可用时，也不会自动移除，同样需要人工处理，此属性不要在生产环境上配置。
+                         * 默认为true
                          */
                         url = url.addParameterIfAbsent(Constants.DYNAMIC_KEY, registryURL.getParameter(Constants.DYNAMIC_KEY));
                         /**
                          *  根据注册中心url(注册中心url)，构建监控中心的URL，如果监控中心URL不为空，则在服务提供者URL上追加monitor，其值为监控中心url(已编码)。
-                         *  1）如果dubbo spring xml配置文件中没有配置监控中心(dubbo:monitor),如果从系统属性-Ddubbo.monitor.address，-Ddubbo.monitor.protocol构建MonitorConfig对象，
-                         *  否则从dubbo的properties配置文件中寻找这个两个参数，如果没有配置，则返回null。
+                         *  1）如果dubbo spring xml配置文件中没有配置监控中心(dubbo:monitor),
+                         *  从系统属性-Ddubbo.monitor.address，-Ddubbo.monitor.protocol构建MonitorConfig对象（只有这两个属性），
+                         *  否则从dubbo的properties（这个配置文件在哪里？？？）配置文件中寻找这个两个参数，如果没有配置，则返回null。
                          *  2）如果有配置，则追加相关参数，dubbo:monitor标签只有两个属性：address、protocol，其次会追加interface(MonitorService)、协议等。
                          */
                         URL monitorUrl = loadMonitor(registryURL);
@@ -697,13 +703,11 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                          * qos.port=22222&
                          * registry=zookeeper&
                          * timestamp=152725551020
-                         *
-                         * -------------------------------------
+                         * ----------------------------------------------
                          * 1）path属性：com.alibaba.dubbo.registry.RegistryService，注册中心也类似于服务提供者。
                          * 2）export属性：值为服务提供者的URL，为什么需要关注这个URL呢？
                          * 请看代码@7，protocol属性为Protocol$Adaptive，Dubbo在加载组件实现类时采用SPI
                          * (插件机制，有关于插件机制，在该专题后续文章将重点分析)，在这里我们只需要知道，根据URL冒号之前的协议名将会调用相应的方法。
-                         *
                          * ----------------------------------------------
                          * 其映射关系(列出与服务启动相关协议实现类)：
                          * dubbo=com.alibaba.dubbo.rpc.protocol.dubbo.DubboProtocol

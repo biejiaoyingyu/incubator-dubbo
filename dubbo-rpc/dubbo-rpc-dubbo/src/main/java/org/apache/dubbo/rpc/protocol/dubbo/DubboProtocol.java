@@ -328,6 +328,7 @@ public class DubboProtocol extends AbstractProtocol {
             /**
              * 根据key从服务器缓存中获取，如果存在，则执行代码@4，如果不存在，则执行代码@3.
              */
+            //服务器实现类
             ExchangeServer server = serverMap.get(key);
             if (server == null) {
                 synchronized (this) {
@@ -335,6 +336,7 @@ public class DubboProtocol extends AbstractProtocol {
                     if (server == null) {
                         /**
                          * 根据URL创建一服务器，Dubbo服务提供者服务器实现类为ExchangeServer。
+                         * 见详细
                          */
                         serverMap.put(key, createServer(url));
                     }
@@ -356,6 +358,7 @@ public class DubboProtocol extends AbstractProtocol {
         //默认开启server关闭时发送readonly事件
         /**
          * 为服务提供者url增加channel.readonly.sent属性，默认为true，表示在发送请求时，是否等待将字节写入socket后再返回，默认为true。
+         * 是等待将字节写入socket后再返回
          */
         url = url.addParameterIfAbsent(Constants.CHANNEL_READONLYEVENT_SENT_KEY, Boolean.TRUE.toString());
         // enable heartbeat by default
@@ -385,6 +388,7 @@ public class DubboProtocol extends AbstractProtocol {
              * 根据服务提供者URI,服务提供者命令请求处理器requestHandler构建ExchangeServer实例。
              * requestHandler的实现具体在以后详细分析Dubbo服务调用时再详细分析。
              */
+            //首先根据url获取Exchanger实例，然后调用bind方法构建ExchangeServer
             server = Exchangers.bind(url, requestHandler);
         } catch (RemotingException e) {
             throw new RpcException("Fail to start server(url: " + url + ") " + e.getMessage(), e);

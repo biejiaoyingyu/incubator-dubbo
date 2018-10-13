@@ -81,6 +81,10 @@ public class NettyServer extends AbstractServer implements Server {
         super(url, ChannelHandlers.wrap(handler, ExecutorUtil.setThreadName(url, SERVER_THREAD_POOL_NAME)));
     }
 
+    /**
+     * netty建立网络的方法
+     * @throws Throwable
+     */
     @Override
     protected void doOpen() throws Throwable {
         /**
