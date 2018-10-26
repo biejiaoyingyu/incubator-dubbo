@@ -72,6 +72,9 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
     }
 
     @SuppressWarnings("unchecked")
+    /**
+     * 返回的是bean的定义信息
+     */
     private static BeanDefinition parse(Element element, ParserContext parserContext, Class<?> beanClass, boolean required) {
         RootBeanDefinition beanDefinition = new RootBeanDefinition();
         beanDefinition.setBeanClass(beanClass);
@@ -80,11 +83,16 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
         //这里会设置懒加载为false其实还可以得到一个推断就是:dubbo标签创建的bean就是单例bean(singleton bean)
         //因为lazy-init的设置只对singleton bean有效，对原型bean(prototype无效)
         beanDefinition.setLazyInit(false);
+        //=====================
+        //下面步骤是获取bean的id
+        //=====================
         String id = element.getAttribute("id");
-        //如果没有设置bean的id,required默认为true
+        //1.如果没有设置bean的id(一般dubbo标签都不会配置id属性和requied属性),required默认为true
         if ((id == null || id.length() == 0) && required) {
             String generatedBeanName = element.getAttribute("name");
-            //name没有配置
+            //name没有配置<dubbo:application name = "工程名" version = "1.0.0">,
+            // <dubbo:protocol name= "dubbo" port = "20880" serialization = "kryo">,
+            //  <dubbo:protocol name= "rest" port = "8888">一般会配置name属性，其他的不一定
             if (generatedBeanName == null || generatedBeanName.length() == 0) {
                 //如果是ProtocolConfig类型，bean name默认为 dubbo，其他的为配置的interface的值
                 if (ProtocolConfig.class.equals(beanClass)) {
