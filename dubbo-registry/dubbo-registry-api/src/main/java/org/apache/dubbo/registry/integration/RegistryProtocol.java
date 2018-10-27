@@ -134,6 +134,7 @@ public class RegistryProtocol implements Protocol {
         /**
          * 启动服务提供者服务，监听指定端口，准备服务消费者的请求，这里其实就是从WrapperInvoker中的url
          * (注册中心url)中提取export属性，描述服务提供者的url，然后启动服务提供者。
+         * 详细进入
          */
         final ExporterChangeableWrapper<T> exporter = doLocalExport(originInvoker);
 
@@ -183,11 +184,12 @@ public class RegistryProtocol implements Protocol {
         return new DestroyableExporter<T>(exporter, originInvoker, overrideSubscribeUrl, registeredProviderUrl);
     }
 
+
     @SuppressWarnings("unchecked")
     /**
      * 将调用DubboProtocol#export完成dubbo服务的启动，利用netty构建一个微型服务端，监听端口，
-     * 准备接受服务消费者的网络请求，本节旨在梳理其启动流程，具体实现细节，将在后续章节中详解，这
-     * 里我们只要知道，,会再此次监听该端口，然后将dubbo:service的服务handler加入到命令处理器
+     * 准备接受服务消费者的网络请求，这里旨在梳理其启动流程，具体实现细节，后来详解，这
+     * 里我们只要知道,会再此次监听该端口，然后将dubbo:service的服务handler加入到命令处理器
      * 中，当有消息消费者连接该端口时，通过网络解包，将需要调用的服务和参数等信息解析处理后，转交
      * 给对应的服务实现类处理即可。
      */

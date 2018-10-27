@@ -27,6 +27,9 @@ public class NettyTransporter implements Transporter {
 
     public static final String NAME = "netty";
 
+    /**
+     * netty版本来查看一下Transporter实现
+     */
     @Override
     public Server bind(URL url, ChannelHandler listener) throws RemotingException {
         return new NettyServer(url, listener);
