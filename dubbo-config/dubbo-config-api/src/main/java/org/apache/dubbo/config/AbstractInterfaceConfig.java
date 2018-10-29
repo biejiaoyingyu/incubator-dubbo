@@ -104,7 +104,9 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
 
     protected void checkRegistry() {
         // for backward compatibility
+        // 向后兼容
         if (registries == null || registries.isEmpty()) {
+            // 获取registry配置
             String address = ConfigUtils.getProperty("dubbo.registry.address");
             if (address != null && address.length() > 0) {
                 registries = new ArrayList<RegistryConfig>();
@@ -112,10 +114,12 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
                 for (String a : as) {
                     RegistryConfig registryConfig = new RegistryConfig();
                     registryConfig.setAddress(a);
+                    // 有相关配置，增加到集合中
                     registries.add(registryConfig);
                 }
             }
         }
+        // registry不能为空
         if ((registries == null || registries.isEmpty())) {
             throw new IllegalStateException((getClass().getSimpleName().startsWith("Reference")
                     ? "No such any registry to refer service in consumer "
@@ -126,6 +130,7 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
                     + ", Please add <dubbo:registry address=\"...\" /> to your spring config. If you want unregister, please set <dubbo:service registry=\"N/A\" />");
         }
         for (RegistryConfig registryConfig : registries) {
+            // 追加配置
             appendProperties(registryConfig);
         }
     }
@@ -133,18 +138,22 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
     @SuppressWarnings("deprecation")
     protected void checkApplication() {
         // for backward compatibility
+        // 向后兼容
         if (application == null) {
+            // 没有application配置则尝试从系统属性中获取
             String applicationName = ConfigUtils.getProperty("dubbo.application.name");
             if (applicationName != null && applicationName.length() > 0) {
                 application = new ApplicationConfig();
             }
         }
+        // 没有配置<dubbo:application/>并且系统属性中也没有，则抛出异常
         if (application == null) {
             throw new IllegalStateException(
                     "No such application config! Please add <dubbo:application name=\"...\" /> to your spring config.");
         }
+        // 追加配置
         appendProperties(application);
-
+        // 如果配置了shutdown wait，设置到系统属性中
         String wait = ConfigUtils.getProperty(Constants.SHUTDOWN_WAIT_KEY);
         if (wait != null && wait.trim().length() > 0) {
             System.setProperty(Constants.SHUTDOWN_WAIT_KEY, wait.trim());
@@ -165,21 +174,26 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
                 if (address == null || address.length() == 0) {
                     address = Constants.ANYHOST_VALUE;
                 }
+                // 获取系统属性的注册中心地址配置
                 String sysaddress = System.getProperty("dubbo.registry.address");
                 if (sysaddress != null && sysaddress.length() > 0) {
                     address = sysaddress;
                 }
                 if (address.length() > 0 && !RegistryConfig.NO_AVAILABLE.equalsIgnoreCase(address)) {
                     Map<String, String> map = new HashMap<String, String>();
+                    /* 追加参数 */
                     appendParameters(map, application);
+                    /* 追加参数 */
                     appendParameters(map, config);
                     map.put("path", RegistryService.class.getName());
                     map.put("dubbo", Version.getProtocolVersion());
                     map.put(Constants.TIMESTAMP_KEY, String.valueOf(System.currentTimeMillis()));
                     if (ConfigUtils.getPid() > 0) {
+                        // 尝试通过java API获取进程id并记录
                         map.put(Constants.PID_KEY, String.valueOf(ConfigUtils.getPid()));
                     }
                     if (!map.containsKey("protocol")) {
+                        // 判断是否有remote扩展，这里涉及到dubbo SPI的内容，我们会用单独的文章进行分析
                         if (ExtensionLoader.getExtensionLoader(RegistryFactory.class).hasExtension("remote")) {
                             map.put("protocol", "remote");
                         } else {
@@ -187,11 +201,12 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
                         }
                     }
                     List<URL> urls = UrlUtils.parseURLs(address, map);
+                    /* 解析URL */
                     for (URL url : urls) {
                         url = url.addParameter(Constants.REGISTRY_KEY, url.getProtocol());
                         url = url.setProtocol(Constants.REGISTRY_PROTOCOL);
-                        if ((provider && url.getParameter(Constants.REGISTER_KEY, true))
-                                || (!provider && url.getParameter(Constants.SUBSCRIBE_KEY, true))) {
+                        if ((provider && url.getParameter(Constants.REGISTER_KEY, true)) || (!provider && url.getParameter(Constants.SUBSCRIBE_KEY, true))) {
+                            // 添加注册中心地址
                             registryList.add(url);
                         }
                     }
@@ -289,23 +304,29 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
     }
 
     protected void checkStubAndMock(Class<?> interfaceClass) {
+        // 缺省类名，即：接口名 + Local后缀
         if (ConfigUtils.isNotEmpty(local)) {
             Class<?> localClass = ConfigUtils.isDefault(local) ? ReflectUtils.forName(interfaceClass.getName() + "Local") : ReflectUtils.forName(local);
+            // 必须实现服务接口
             if (!interfaceClass.isAssignableFrom(localClass)) {
                 throw new IllegalStateException("The local implementation class " + localClass.getName() + " not implement interface " + interfaceClass.getName());
             }
             try {
+                // 构造函数必须允许传入服务对象
                 ReflectUtils.findConstructor(localClass, interfaceClass);
             } catch (NoSuchMethodException e) {
                 throw new IllegalStateException("No such constructor \"public " + localClass.getSimpleName() + "(" + interfaceClass.getName() + ")\" in local implementation class " + localClass.getName());
             }
         }
         if (ConfigUtils.isNotEmpty(stub)) {
+            // 缺省类名，即：接口名 + Stub后缀
             Class<?> localClass = ConfigUtils.isDefault(stub) ? ReflectUtils.forName(interfaceClass.getName() + "Stub") : ReflectUtils.forName(stub);
+            // 必须实现服务接口
             if (!interfaceClass.isAssignableFrom(localClass)) {
                 throw new IllegalStateException("The local implementation class " + localClass.getName() + " not implement interface " + interfaceClass.getName());
             }
             try {
+                // 构造函数必须允许传入服务对象
                 ReflectUtils.findConstructor(localClass, interfaceClass);
             } catch (NoSuchMethodException e) {
                 throw new IllegalStateException("No such constructor \"public " + localClass.getSimpleName() + "(" + interfaceClass.getName() + ")\" in local implementation class " + localClass.getName());
@@ -315,16 +336,20 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
             if (mock.startsWith(Constants.RETURN_PREFIX)) {
                 String value = mock.substring(Constants.RETURN_PREFIX.length());
                 try {
+                    // 如果是return作为前缀，则解析mock的值（值可以为empty、null、true、false、json字符串等）
                     MockInvoker.parseMockValue(value);
                 } catch (Exception e) {
                     throw new IllegalStateException("Illegal mock json value in <dubbo:service ... mock=\"" + mock + "\" />");
                 }
             } else {
+                // 缺省类名，即：接口名 + Mock后缀
                 Class<?> mockClass = ConfigUtils.isDefault(mock) ? ReflectUtils.forName(interfaceClass.getName() + "Mock") : ReflectUtils.forName(mock);
+                // 必须实现服务接口
                 if (!interfaceClass.isAssignableFrom(mockClass)) {
                     throw new IllegalStateException("The mock implementation class " + mockClass.getName() + " not implement interface " + interfaceClass.getName());
                 }
                 try {
+                    // 需要有无参构造函数
                     mockClass.getConstructor(new Class<?>[0]);
                 } catch (NoSuchMethodException e) {
                     throw new IllegalStateException("No such empty constructor \"public " + mockClass.getSimpleName() + "()\" in mock implementation class " + mockClass.getName());

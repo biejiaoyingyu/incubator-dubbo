@@ -119,20 +119,25 @@ public class ConfigUtils {
     }
 
     public static String replaceProperty(String expression, Map<String, String> params) {
+        // 表达式不含$忽略
         if (expression == null || expression.length() == 0 || expression.indexOf('$') < 0) {
             return expression;
         }
+        // 正则为\$\s*\{?\s*([\._0-9a-zA-Z]+)\s*\}?
         Matcher matcher = VARIABLE_PATTERN.matcher(expression);
         StringBuffer sb = new StringBuffer();
         while (matcher.find()) {
             String key = matcher.group(1);
+            // 首先尝试从系统属性中获取
             String value = System.getProperty(key);
             if (value == null && params != null) {
+                // 没有再尝试从properties中获取
                 value = params.get(key);
             }
             if (value == null) {
                 value = "";
             }
+            // 替换表达式为配置值
             matcher.appendReplacement(sb, Matcher.quoteReplacement(value));
         }
         matcher.appendTail(sb);
@@ -177,7 +182,9 @@ public class ConfigUtils {
         if (value != null && value.length() > 0) {
             return value;
         }
+        /* 获取properties配置 */
         Properties properties = getProperties();
+        /* 将$和${}表达式替换为对应配置 */
         return replaceProperty(properties.getProperty(key, defaultValue), (Map) properties);
     }
 

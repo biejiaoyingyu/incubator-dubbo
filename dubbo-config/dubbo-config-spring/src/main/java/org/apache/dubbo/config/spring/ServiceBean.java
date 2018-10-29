@@ -167,6 +167,8 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
          *  则取该实例，如果存在多个dubbo:provider配置则provider属性不能为空，（开发者手册说明多个取第一个的么？）
 
          *  否则抛出异常：”Duplicate provider configs”。
+         *
+         *  https://blog.csdn.net/heroqiang/article/details/79171681
          */
         if (getProvider() == null) {
             //============================================================================================

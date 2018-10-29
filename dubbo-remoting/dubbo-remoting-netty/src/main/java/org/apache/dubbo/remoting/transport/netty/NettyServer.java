@@ -125,6 +125,7 @@ public class NettyServer extends AbstractServer implements Server {
                  * 个的RPC请求，然后针对每一个RPC请求，交给NettyHandler相关事件处理方法去处理，在这里传入NettyHandler的
                  * ChannelHandler为NettyServer,以网络读命令为例，最终将调用NettyServer的父类AbstractPeer的received方法
                  */
+
                 pipeline.addLast("decoder", adapter.getDecoder());
                 pipeline.addLast("encoder", adapter.getEncoder());
                 pipeline.addLast("handler", nettyHandler);//@2

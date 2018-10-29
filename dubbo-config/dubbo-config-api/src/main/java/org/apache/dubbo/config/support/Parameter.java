@@ -34,9 +34,9 @@ public @interface Parameter {
 
     boolean required() default false;
 
-    boolean excluded() default false;
-
     boolean escaped() default false;
+
+    boolean excluded() default false;
 
     boolean attribute() default false;
 
