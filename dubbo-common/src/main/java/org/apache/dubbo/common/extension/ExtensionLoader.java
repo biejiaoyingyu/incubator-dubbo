@@ -116,9 +116,11 @@ public class ExtensionLoader<T> {
     public static <T> ExtensionLoader<T> getExtensionLoader(Class<T> type) {
         if (type == null)
             throw new IllegalArgumentException("Extension type == null");
+        // type必须是接口
         if (!type.isInterface()) {
             throw new IllegalArgumentException("Extension type(" + type + ") is not interface!");
         }
+        // 必须注解@SPI
         if (!withExtensionAnnotation(type)) {
             throw new IllegalArgumentException("Extension type(" + type +
                     ") is not extension, because WITHOUT @" + SPI.class.getSimpleName() + " Annotation!");
@@ -126,6 +128,7 @@ public class ExtensionLoader<T> {
 
         ExtensionLoader<T> loader = (ExtensionLoader<T>) EXTENSION_LOADERS.get(type);
         if (loader == null) {
+            // 缓存中没有则新建ExtensionLoader对象放入缓存
             EXTENSION_LOADERS.putIfAbsent(type, new ExtensionLoader<T>(type));
             loader = (ExtensionLoader<T>) EXTENSION_LOADERS.get(type);
         }
@@ -495,16 +498,20 @@ public class ExtensionLoader<T> {
      * 获得spi扩展点的实例？？
      */
     public T getAdaptiveExtension() {
+        // 首先尝试从缓存中获取
         Object instance = cachedAdaptiveInstance.get();
         if (instance == null) {
             if (createAdaptiveInstanceError == null) {
                 synchronized (cachedAdaptiveInstance) {
+                    // 二次检查
                     instance = cachedAdaptiveInstance.get();
                     if (instance == null) {
                         try {
+                            /* 创建自适应扩展点 */
                             instance = createAdaptiveExtension();
                             cachedAdaptiveInstance.set(instance);
                         } catch (Throwable t) {
+                            // 记录创建自适应扩展点错误信息
                             createAdaptiveInstanceError = t;
                             throw new IllegalStateException("fail to create adaptive instance: " + t.toString(), t);
                         }
@@ -626,11 +633,14 @@ public class ExtensionLoader<T> {
     }
 
     private Map<String, Class<?>> getExtensionClasses() {
+        // 同样的首先尝试从缓存中获取
         Map<String, Class<?>> classes = cachedClasses.get();
         if (classes == null) {
             synchronized (cachedClasses) {
+                // double check，二次检查
                 classes = cachedClasses.get();
                 if (classes == null) {
+                     /* 加载扩展点class */
                     classes = loadExtensionClasses();
                     cachedClasses.set(classes);
                 }
@@ -641,20 +651,25 @@ public class ExtensionLoader<T> {
 
     // synchronized in getExtensionClasses
     private Map<String, Class<?>> loadExtensionClasses() {
+        // 获取@SPI注解信息
         final SPI defaultAnnotation = type.getAnnotation(SPI.class);
         if (defaultAnnotation != null) {
+            // 获取默认值
             String value = defaultAnnotation.value();
             if ((value = value.trim()).length() > 0) {
                 String[] names = NAME_SEPARATOR.split(value);
+                // 默认扩展点只能有一个
                 if (names.length > 1) {
                     throw new IllegalStateException("more than 1 default extension name on extension " + type.getName()
                             + ": " + Arrays.toString(names));
                 }
+                // 如果默认扩展点名称唯一，缓存默认扩展点名称
                 if (names.length == 1) cachedDefaultName = names[0];
             }
         }
 
         Map<String, Class<?>> extensionClasses = new HashMap<String, Class<?>>();
+        /* 加载META-INF/dubbo/internal/、META-INF/dubbo/、META-INF/services/ 三个目录下的文件 */
         loadDirectory(extensionClasses, DUBBO_INTERNAL_DIRECTORY, type.getName());
         loadDirectory(extensionClasses, DUBBO_INTERNAL_DIRECTORY, type.getName().replace("org.apache", "com.alibaba"));
         loadDirectory(extensionClasses, DUBBO_DIRECTORY, type.getName());
@@ -665,10 +680,12 @@ public class ExtensionLoader<T> {
     }
 
     private void loadDirectory(Map<String, Class<?>> extensionClasses, String dir, String type) {
+        // 目录+接口名
         String fileName = dir + type;
         try {
             Enumeration<java.net.URL> urls;
             ClassLoader classLoader = findClassLoader();
+            // 加载文件资源
             if (classLoader != null) {
                 urls = classLoader.getResources(fileName);
             } else {
@@ -691,16 +708,21 @@ public class ExtensionLoader<T> {
             BufferedReader reader = new BufferedReader(new InputStreamReader(resourceURL.openStream(), "utf-8"));
             try {
                 String line;
+                // 读取一行
                 while ((line = reader.readLine()) != null) {
+                    // #号代表注释，要忽略掉
                     final int ci = line.indexOf('#');
                     if (ci >= 0) line = line.substring(0, ci);
                     line = line.trim();
                     if (line.length() > 0) {
                         try {
                             String name = null;
+
                             int i = line.indexOf('=');
                             if (i > 0) {
+                                // =号前为key
                                 name = line.substring(0, i).trim();
+                                // =号后为value
                                 line = line.substring(i + 1).trim();
                             }
                             if (line.length() > 0) {
@@ -733,6 +755,7 @@ public class ExtensionLoader<T> {
      * @throws NoSuchMethodException
      */
     private void loadClass(Map<String, Class<?>> extensionClasses, java.net.URL resourceURL, Class<?> clazz, String name) throws NoSuchMethodException {
+        // 如果配置的class不是给定接口的实现类，抛出异常
         if (!type.isAssignableFrom(clazz)) {
             throw new IllegalStateException("Error when load extension class(interface: " +
                     type + ", class line: " + clazz.getName() + "), class "
@@ -744,10 +767,13 @@ public class ExtensionLoader<T> {
          * 有 Adaptive 注解，如果是，则直接赋值
          * 这里同时可以确认，对于一个 spi 接口，有且只有一个类带有 adaptive 注解，否则会出错；
          */
+        // 注解@Adaptive的class为自适应扩展点
         if (clazz.isAnnotationPresent(Adaptive.class)) {
             if (cachedAdaptiveClass == null) {
+                // 缓存自适应扩展点类型
                 cachedAdaptiveClass = clazz;
             } else if (!cachedAdaptiveClass.equals(clazz)) {
+                // 给定接口的自适应扩展点只能有一个
                 throw new IllegalStateException("More than 1 adaptive class found: "
                         + cachedAdaptiveClass.getClass().getName()
                         + ", " + clazz.getClass().getName());
@@ -760,6 +786,7 @@ public class ExtensionLoader<T> {
             }
             wrappers.add(clazz);
         } else {
+            // 尝试获取以给定接口为参数的构造方法
             clazz.getConstructor();
             if (name == null || name.length() == 0) {
                 name = findAnnotationName(clazz);
@@ -822,6 +849,7 @@ public class ExtensionLoader<T> {
      */
     private T createAdaptiveExtension() {
         try {
+             /* 获取自适应扩展点实例，并进行注入 */
             return injectExtension((T) getAdaptiveExtensionClass().newInstance());
         } catch (Exception e) {
             throw new IllegalStateException("Can not create adaptive extension " + type + ", cause: " + e.getMessage(), e);
@@ -835,10 +863,13 @@ public class ExtensionLoader<T> {
      * @return
      */
     private Class<?> getAdaptiveExtensionClass() {
+         /* 获取扩展点class */
         getExtensionClasses();
         if (cachedAdaptiveClass != null) {
+            // 如果缓存的自适应扩展点class不为null，直接返回
             return cachedAdaptiveClass;
         }
+         /* 创建自适应扩展点class并返回 */
         return cachedAdaptiveClass = createAdaptiveExtensionClass();
     }
 
