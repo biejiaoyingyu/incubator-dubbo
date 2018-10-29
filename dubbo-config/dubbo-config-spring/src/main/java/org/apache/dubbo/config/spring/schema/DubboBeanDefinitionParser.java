@@ -87,7 +87,7 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
         //下面步骤是获取bean的id
         //=====================
         String id = element.getAttribute("id");
-        //1.如果没有设置bean的id(一般dubbo标签都不会配置id属性和requied属性),required默认为true
+        //1.如果没有设置bean的id(一般dubbo标签都不会配置id属性和requied属性),required默认为true,尝试获取name属性
         if ((id == null || id.length() == 0) && required) {
             String generatedBeanName = element.getAttribute("name");
             //name没有配置<dubbo:application name = "工程名" version = "1.0.0">,
