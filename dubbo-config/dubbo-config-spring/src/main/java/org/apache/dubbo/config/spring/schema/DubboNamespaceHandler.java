@@ -58,7 +58,7 @@ import org.springframework.beans.factory.xml.NamespaceHandlerSupport;
  * BeanDefinitionParser 的实现类，Spring 提供了默认实现类 NamespaceHandlerSupport 和
  * AbstractSingleBeanDefinitionParser，简单的方式就是去继承这两个类
  *
- * //		Step1：解析id属性，如果DubboBeanDefinitionParser对象的required属性为true，如果id为空，则根据如下规则构建一个id。
+ 		Step1：解析id属性，如果DubboBeanDefinitionParser对象的required属性为true，如果id为空，则根据如下规则构建一个id。
  //		1）如果name属性不为空，则取name的值，如果已存在，则为 name + 序号,例如  name,name1,name2。
  //		2）如果name属性为空，如果是dubbo:protocol标签，则取protocol属性，其他的则取interface属性，如果不为空，则取该值，但如果已存在，和name处理相同，在后面追加序号。
  //		3）如果第二步还未空，则取beanClass的名称，如果已存在，则追加序号。

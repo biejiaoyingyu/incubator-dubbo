@@ -103,6 +103,12 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         appendAnnotation(Service.class, service);
     }
 
+
+    /**
+     * 从每个<dubbo:provider/>中提取出一个<dubbo:protocol/>
+     * @param providers
+     * @return
+     */
     @Deprecated
     private static List<ProtocolConfig> convertProviderToProtocol(List<ProviderConfig> providers) {
         if (providers == null || providers.isEmpty()) {
@@ -127,6 +133,11 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         return providers;
     }
 
+    /**
+     * 分别设置属性
+     * @param provider
+     * @return
+     */
     @Deprecated
     private static ProtocolConfig convertProviderToProtocol(ProviderConfig provider) {
         ProtocolConfig protocol = new ProtocolConfig();
@@ -193,10 +204,14 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
     }
 
     public synchronized void export() {
-        //如果provider属性不为空
+        //=========================
+        ////如果provider属性不为优先
+        //==========================
+
         if (provider != null) {
             //如果exporter没有配置使用provider所关联的exporter
             if (export == null) {
+                //优先使用偏离provider的么？
                 export = provider.getExport();
             }
             //如果delay（延迟暴露）没有配置，获取provider的delay
@@ -207,6 +222,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         //如果不需要暴露接口则直接返回
         /**
          * 判断是否暴露服务，由dubbo:service export=”true|false”来指定。配置手册中好像没有这个属性啊？？？
+         * 默认可以配置，见xds文件。
          */
         if (export != null && !export) {
             return;
@@ -239,8 +255,16 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         if (interfaceName == null || interfaceName.length() == 0) {
             throw new IllegalStateException("<dubbo:service interface=\"\" /> interface not allow null!");
         }
+        /**
+         * 如果dubbo:service标签也就是ServiceBean的provider属性为空，调用appendProperties方法，填充默认属性，其具体加载顺序：
+         * 1）从系统属性加载对应参数值，参数键：dubbo.provider.属性名，System.getProperty。
+         * 2）加载属性配置文件的值。属性配置文件，可通过系统属性：dubbo.properties.file，如果该值未配置，则默认取dubbo.properties属性配置文件。
+         */
         checkDefault();
+        //=========================================================================================================
         //provider已经配置的情况下，如果application、module、registries、monitor、protocol中有未配置的均可以从provider获取
+        //=========================================================================================================
+        //provider优先
         if (provider != null) {
             if (application == null) {
                 application = provider.getApplication();
@@ -258,6 +282,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                 protocols = provider.getProtocols();
             }
         }
+        //从module中获取注册中心和monitor次之
         if (module != null) {
             if (registries == null) {
                 registries = module.getRegistries();
@@ -266,6 +291,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                 monitor = module.getMonitor();
             }
         }
+        //从application中获取注册中心和monitor再次之
         if (application != null) {
             if (registries == null) {
                 registries = application.getRegistries();
@@ -276,6 +302,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         }
         /**
          * 校验ref与interface属性。如果ref是GenericService，则为dubbo的泛化实现，然后验证interface接口与ref引用的类型是否一致。
+         * 什么是泛化实现
          */
         if (ref instanceof GenericService) {
             interfaceClass = GenericService.class;
@@ -284,12 +311,14 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
             }
         } else {
             try {
-                interfaceClass = Class.forName(interfaceName, true, Thread.currentThread()
-                        .getContextClassLoader());
+                //寻找interface对应的接口
+                interfaceClass = Class.forName(interfaceName, true, Thread.currentThread().getContextClassLoader());
             } catch (ClassNotFoundException e) {
                 throw new IllegalStateException(e.getMessage(), e);
             }
+            //验证这个interfaceClass是不是接口和对应配置的方法是不是存在
             checkInterfaceAndMethods(interfaceClass, methods);
+            //验证ref引用的类是interfaceClass的实现
             checkRef();
             generic = Boolean.FALSE.toString();
         }
@@ -316,9 +345,18 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         //如果是远程服务
         /**
          * 处理本地存根Stub
+         *   //stub设为true，表示使用缺省代理类名，即：接口名 + Local后缀，服务接口客户端本地代理类名，用于在客户端执行本地逻辑，如本地缓存等，
+         *   该本地代理类的构造函数必须允许传入远程代理对象，构造函数如：public XxxServiceLocal(XxxService xxxService)
+         *
+         *   远程服务后，客户端通常只剩下接口，而实现全在服务器端，但提供方有些时候想在客户端也执行部分逻辑，那么就在服务消费者这
+         *   一端提供了一个Stub类，然后当消费者调用provider方提供的dubbo服务时，客户端生成 Proxy 实例，这个Proxy实例就是我们
+         *   正常调用dubbo远程服务要生成的代理实例，然后消费者这方会把 Proxy 通过构造函数传给 消费者方的Stub ，然后把 Stub 暴
+         *   露给用户，Stub 可以决定要不要去调 Proxy。会通过代理类去完成这个调用，这样在Stub类中，就可以做一些额外的事，来对服
+         *   务的调用过程进行优化或者容错的处理。
          */
         if (stub != null) {
             if ("true".equals(stub)) {
+                //这里需要断点看一下interfaceName是什么===》应该是interface属性
                 stub = interfaceName + "Stub";
             }
             Class<?> stubClass;
@@ -328,6 +366,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
             } catch (ClassNotFoundException e) {
                 throw new IllegalStateException(e.getMessage(), e);
             }
+            //判断interfaceClass是stubClass的同类和父类返回true
             if (!interfaceClass.isAssignableFrom(stubClass)) {
                 throw new IllegalStateException("The stub implementation class " + stubClass.getName() + " not implement interface " + interfaceName);
             }
@@ -349,6 +388,12 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         checkProtocol();
         //将所有这些对象的属性关联到provider
         appendProperties(this);
+        //检查 local,stub是否存在，是否实现interfaceClass接口，
+        //是否有指定的构造函数
+        /*并检查是否mock,有两种方式，
+          1 return xxx;
+          2 指定 mock 类
+         */
         checkStubAndMock(interfaceClass);
         if (path == null || path.length() == 0) {
             path = interfaceName;
@@ -418,10 +463,20 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
          * 如果配置了register=”false”，则忽略该地址，
          * 如果是服务消费者，并配置了subscribe=”false”
          * 则表示不从该注册中心订阅服务，故也不返回
+         *
+         * registry://127.0.0.1:2181/com.alibaba.dubbo.registry.RegistryService?
+         * application=dubbo-provider&
+         * dubbo=2.5.6&
+         * file=/data/dubbo/cache/dubbo-provider&
+         * pid=21448&
+         * registry=zookeeper&
+         * timestamp=1524134852031
          */
         List<URL> registryURLs = loadRegistries(true);
         /**
          * 然后遍历配置的所有协议，根据每个协议，向注册中心暴露服务，接下来重点分析doExportUrlsFor1Protocol方法的实现细节。
+         * 将服务发布到多种协议的url上，并且携带注册中心列表的参数，从这里我们可以看出dubbo是支持同时将一个服务发布成为多种协
+         * 议的，这个需求也是很正常的，客户端也需要支持多协议，根据不同的场景选择合适的协议。
          * 那么dobbo支持哪些协议呢？？？
          */
         for (ProtocolConfig protocolConfig : protocols) {
@@ -560,6 +615,30 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         }
         // export service
         // 导出服务
+
+        // 服务发布 map 中的一些关键配置信息
+            /*
+            map = {HashMap@6276}  size = 17
+             0 = {HashMap$Node@6516} "side" -> "provider"
+             1 = {HashMap$Node@6517} "default.version" -> "1.0"
+             2 = {HashMap$Node@6518} "methods" -> "sayHello"
+             3 = {HashMap$Node@6519} "dubbo" -> "2.5.6"
+             4 = {HashMap$Node@6520} "threads" -> "500"
+             5 = {HashMap$Node@6521} "pid" -> "21448"
+             6 = {HashMap$Node@6522} "interface" -> "io.ymq.dubbo.api.DemoService"
+             7 = {HashMap$Node@6523} "threadpool" -> "fixed"
+             8 = {HashMap$Node@6524} "generic" -> "false"
+             9 = {HashMap$Node@6525} "default.retries" -> "0"
+             10 = {HashMap$Node@6526} "delay" -> "-1"
+             11 = {HashMap$Node@6527} "application" -> "dubbo-provider"
+             12 = {HashMap$Node@6528} "default.connections" -> "5"
+             13 = {HashMap$Node@6529} "default.delay" -> "-1"
+             14 = {HashMap$Node@6530} "default.timeout" -> "10000"
+             15 = {HashMap$Node@6531} "anyhost" -> "true"
+             16 = {HashMap$Node@6532} "timestamp" -> "1524135271940"
+
+             https://blog.csdn.net/yanpenglei/article/details/80261762
+            */
         /**
          * 设置协议的contextPath,如果未配置，默认为/interfacename
          */
@@ -612,6 +691,27 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
          * side=provider&
          * timestamp=1527168070857
          */
+
+        /*
+            dubbo://10.4.81.95:20880/io.ymq.dubbo.api.DemoService?
+            anyhost=true&
+            application=dubboprovider&
+            default.connections=5&
+            default.delay=-1&
+            default.retries=0&
+            default.timeout=10000&
+            default.version=1.0&
+            delay=-1&
+            dubbo=2.5.6&
+            generic=false&
+            interface=io.ymq.dubbo.api.DemoService&
+            methods=sayHello&
+            pid=21448&
+            side=provider&
+            threadpool=fixed&
+            threads=500&
+            timestamp=1524135271940
+            */
         URL url = new URL(name, host, port, (contextPath == null || contextPath.length() == 0 ? "" : contextPath + "/") + path, map);
 
         if (ExtensionLoader.getExtensionLoader(ConfiguratorFactory.class)
