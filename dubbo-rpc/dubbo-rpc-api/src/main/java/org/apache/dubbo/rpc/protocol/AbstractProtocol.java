@@ -37,8 +37,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public abstract class AbstractProtocol implements Protocol {
 
     protected final Logger logger = LoggerFactory.getLogger(getClass());
-
-
     /**
      * 1、exporterMap表示发布过的serviceKey和Exporter（远程服务发布的引用）的映射表；
      */

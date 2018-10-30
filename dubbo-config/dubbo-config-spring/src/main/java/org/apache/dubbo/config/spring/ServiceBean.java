@@ -201,12 +201,12 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
                         setProviders(providerConfigs);
                     }
                 } else {
-                    //==================================================================================================
+                    //=================================================================================================
                     // 正常版本==>1.只配配置了<dubbo:protocol/>没有配置<dubbo:provider/>===>不用管<dubbo:provider>
                     //           2.只配置了一个<dubbo:provider/>没有配置<dubbo:protocol/>===>如果default为缺省或者true直接关联
                     //           3.配置了<dubbo:protocol/>并且配置了<dubbo:provider/>(可以为多个)===><dubbo:provider/>的
                     //              default属性只能有一个为缺省值或则true不然会报错
-                    //==================================================================================================
+                    //=================================================================================================
                     //到这里由于service标签中provider没有配置属性，那么需要从provider标签中获取一个，这里显示如果有多个就会报错
                     //如果某个provider配置包含子node（ServiceBean），且没有明确指定default，也会被当成默认配置么？应该不会
                     //这个疑问请参看：com\alibaba\dubbo\config\spring\schema\DubboBeanDefinitionParser.java中330行注解

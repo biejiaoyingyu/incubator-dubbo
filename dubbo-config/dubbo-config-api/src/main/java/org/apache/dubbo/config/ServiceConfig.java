@@ -695,10 +695,10 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         Integer port = this.findConfigedPorts(protocolConfig, name, map);
         //创建服务所在url
         /**
-         * 根据协议名称、协议host、协议端口、contextPath、相关配置属性（application、module、
+         * 根据协议名称、协议host、协议端口、contextPath、相关配置属性（application、module
          * provider、protocolConfig、service及其子标签）构建服务提供者URI。
          *
-         * -----------------------------------------------------------------------
+         * --------------------------------------------------------------------
          * 以dubbo协议为例，展示最终服务提供者的URL信息如下：
          * dubbo://192.168.56.1:20880/com.alibaba.dubbo.demo.DemoService?
          * anyhost=true&
