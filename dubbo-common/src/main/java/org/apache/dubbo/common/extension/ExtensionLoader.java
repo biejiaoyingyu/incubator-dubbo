@@ -88,7 +88,16 @@ public class ExtensionLoader<T> {
      *
      * 在 getExtensionClasses 函数中，在读取文件加载类的过程过程中，会判断该类是否带
      * 有 Adaptive 注解，如果是，则直接赋值
-     * ========================================
+     * ========================================https://www.cnblogs.com/heart-king/p/5632524.html(spi很重要)
+     * 1）如果有打在接口方法上，调ExtensionLoader.getAdaptiveExtension()获取设配类，会先通过前面的过程生成java的源代码，
+
+     * 在通过编译器编译成class加载。但是Compiler的实现策略选择也是通过ExtensionLoader.getAdaptiveExtension()，
+
+     * 如果也通过编译器编译成class文件那岂不是要死循环下去了吗？
+
+     * ExtensionLoader.getAdaptiveExtension()，对于有实现类上去打了注解@Adaptive的dubbo spi扩展机制，它获取设配类
+     * 不在通过前面过程生成设配类java源代码，而是在读取扩展文件的时候遇到实现类打了注解@Adaptive就把这个类作为设配类缓存
+     * 在ExtensionLoader中，调用是直接返回
      *
      * 静态方法的调用不会导致类的初始化
      * 不同类型会创建一个ExtensionLoader对象
@@ -112,6 +121,8 @@ public class ExtensionLoader<T> {
     @SuppressWarnings("unchecked")
     //Protocol protocol = ExtensionLoader.getExtensionLoader(Protocol.class).getAdaptiveExtension();
     /**
+     * 每个定义的spi的接口都会构建一个ExtensionLoader实例
+     * 静态的对象ConcurrentMap<Class<?>,ExtensionLoader<?>> EXTENSION_LOADERS 这个map对象中
      * 获取ExtensionLoader--->根据类型先从缓存中获取--->获取不到创建
      */
     public static <T> ExtensionLoader<T> getExtensionLoader(Class<T> type) {
@@ -777,6 +788,11 @@ public class ExtensionLoader<T> {
          * 这里同时可以确认，对于一个 spi 接口，有且只有一个类带有 adaptive 注解，否则会出错；
          */
         // 注解@Adaptive的class为自适应扩展点
+
+        /**
+         * 判断类实现（如：DubboProtocol）上有么有打上@Adaptive注解，如果打上了注解，将此类作为Protocol协议
+         * 的设配类缓存起来，读取下一行；否则适配类通过javasisit修改字节码生成，关于设配类功能作用后续介绍
+         */
         if (clazz.isAnnotationPresent(Adaptive.class)) {
             if (cachedAdaptiveClass == null) {
                 // 缓存自适应扩展点类型
@@ -799,6 +815,10 @@ public class ExtensionLoader<T> {
                 }
             }*/
         } else if (isWrapperClass(clazz)) {
+            /**
+             * 如果类实现没有打上@Adaptive， 判断实现类是否存在入参为接口的构造器（就是DubbboProtocol类是否还有入参为Protocol的构造器），
+             * 有的话作为包装类缓存到此ExtensionLoader的Set<Class<?>>集合中，这个其实是个装饰模式
+             */
             Set<Class<?>> wrappers = cachedWrapperClasses;
             if (wrappers == null) {
                 cachedWrapperClasses = new ConcurrentHashSet<Class<?>>();
@@ -808,6 +828,11 @@ public class ExtensionLoader<T> {
             wrappers.add(clazz);
         } else {
             // 没有以给定接口为参数的构造方法则尝试获取默认无参构造方法
+            /**
+             * 如果即不是设配对象也不是wrapped的对象，那就是扩展点的具体实现对象　　
+             * 查找实现类上有没有打上@Activate注解，有缓存到变量cachedActivates
+             * 的map中将实现类缓存到cachedClasses中，以便于使用时获取
+             */
             clazz.getConstructor();
             if (name == null || name.length() == 0) {
                 /* 如果配置的key为空，则尝试获取class注解中配置的name 也即在配置中没有指定相应的key值，可以在类上面用@Extension("NAME1")指定*/
@@ -903,12 +928,28 @@ public class ExtensionLoader<T> {
          //获取扩展点class ===>如果有@Adaptive注解存在缓存中 Class<?>  cachedAdaptiveClass  ===>尝试从缓存中获取
         getExtensionClasses();
         if (cachedAdaptiveClass != null) {
-            // 如果缓存的自适应扩展点class不为null，直接返回
+            // 如果缓存的自适应扩展点class不为null，直接返回===>说明有且仅有一个实现类打了@Adaptive, 实例化这个对象返回
             return cachedAdaptiveClass;
         }
-         // 创建自适应扩展点class并返回 如果没有有@Adaptive注解创建智适应点
+         // 创建自适应扩展点class并返回 如果没有有@Adaptive注解创建智适应点===>创建设配类字节码
         return cachedAdaptiveClass = createAdaptiveExtensionClass();
     }
+
+    /**
+     * 为什么要创建设配类，一个接口多种实现，SPI机制也是如此，这是策略模式，但是我们在代码执行过程中选择哪种具体的策略呢。
+     * Dubbo采用统一数据模式com.alibaba.dubbo.common.URL(它是dubbo定义的数据模型不是jdk的类)，它会穿插于系统的整个执
+     * 行过程，URL中定义的协议类型字段protocol，会根据具体业务设置不同的协议。url.getProtocol()值可以是dubbo也是可以
+     * webservice， 可以是zookeeper也可以是redis。
+
+     * 设配类的作用是根据url.getProtocol()的值extName，去ExtensionLoader. getExtension( extName)选取具体的扩展点实现。
+
+     * 所以能够利用javasist生成设配类的条件
+
+     * 1）接口方法中必须至少有一个方法打上了@Adaptive注解
+
+     * 2）打上了@Adaptive注解的方法参数必须有URL类型参数或者有参数中存在getURL()方法
+     * @return
+     */
 
     private Class<?> createAdaptiveExtensionClass() {
         // 拼接自适应扩展点class的字符串
@@ -943,33 +984,78 @@ public class ExtensionLoader<T> {
         }
     }*/
 //====================================
-/*package com.alibaba.dubbo.rpc;
-import com.alibaba.dubbo.common.extension.ExtensionLoader;
-    public class Protocol$Adaptive implements com.alibaba.dubbo.rpc.Protocol {
-        public void destroy() {
-            throw new UnsupportedOperationException("method public abstract void com.alibaba.dubbo.rpc.Protocol.destroy() of interface com.alibaba.dubbo.rpc.Protocol is not adaptive method!");
-        }
-        public int getDefaultPort() {
-            throw new UnsupportedOperationException("method public abstract int com.alibaba.dubbo.rpc.Protocol.getDefaultPort() of interface com.alibaba.dubbo.rpc.Protocol is not adaptive method!");
-        }
-        public com.alibaba.dubbo.rpc.Invoker refer(java.lang.Class arg0, com.alibaba.dubbo.common.URL arg1) throws com.alibaba.dubbo.rpc.RpcException {
-            if (arg1 == null) throw new IllegalArgumentException("url == null");
-            com.alibaba.dubbo.common.URL url = arg1;
-            String extName = (url.getProtocol() == null ? "dubbo" : url.getProtocol());
-            if (extName == null) throw new IllegalStateException("Fail to get extension(com.alibaba.dubbo.rpc.Protocol) name from url(" + url.toString() + ") use keys([protocol])");
-            com.alibaba.dubbo.rpc.Protocol extension = (com.alibaba.dubbo.rpc.Protocol) ExtensionLoader.getExtensionLoader(com.alibaba.dubbo.rpc.Protocol.class).getExtension(extName);
-            return extension.refer(arg0, arg1);
-        }
-        public com.alibaba.dubbo.rpc.Exporter export (com.alibaba.dubbo.rpc.Invoker arg0) throws com.alibaba.dubbo.rpc.RpcException {
-            if (arg0 == null) throw new IllegalArgumentException("com.alibaba.dubbo.rpc.Invoker argument == null");
-            if (arg0.getUrl() == null) throw new IllegalArgumentException("com.alibaba.dubbo.rpc.Invoker argument getUrl() == null");
-            com.alibaba.dubbo.common.URL url = arg0.getUrl();
-            String extName = (url.getProtocol() == null ? "dubbo" : url.getProtocol());
-            if (extName == null) throw new IllegalStateException("Fail to get extension(com.alibaba.dubbo.rpc.Protocol) name from url(" + url.toString() + ") use keys([protocol])");
-            com.alibaba.dubbo.rpc.Protocol extension = (com.alibaba.dubbo.rpc.Protocol) ExtensionLoader.getExtensionLoader(com.alibaba.dubbo.rpc.Protocol.class).getExtension(extName);
-            return extension.export(arg0);
-        }
-    }*/
+/*package com.alibaba.dubbo.demo.rayhong.test;
+
+          import com.alibaba.dubbo.common.extension.ExtensionLoader;
+
+          public class Protocol$Adpative implements com.alibaba.dubbo.rpc.Protocol {
+
+              // 没有打上@Adaptive的方法如果被调到抛异常
+              public void destroy() {
+                     throw new UnsupportedOperationException(
+                                     "method public abstract void com.alibaba.dubbo.rpc.Protocol.destroy() "
+                                     + "of interface com.alibaba.dubbo.rpc.Protocol is not adaptive method!");
+
+                }
+
+             // 没有打上@Adaptive的方法如果被调到抛异常
+             public int getDefaultPort() {
+                     throw new UnsupportedOperationException(
+                                     "method public abstractint com.alibaba.dubbo.rpc.Protocol.getDefaultPort() "
+                                     + "of interfacecom.alibaba.dubbo.rpc.Protocol is not adaptive method!");
+                 }
+
+            // 接口中export方法打上@Adaptive注册
+             public com.alibaba.dubbo.rpc.Exporter export(com.alibaba.dubbo.rpc.Invoker arg0) {
+                     if (arg0 == null)
+                             throw new IllegalArgumentException("com.alibaba.dubbo.rpc.Invokerargument == null");
+
+                    // 参数类中要有URL属性
+                    if (arg0.getUrl() == null)
+                           throw new IllegalArgumentException("com.alibaba.dubbo.rpc.Invokerargument getUrl() == null");
+
+                     // 从入参获取统一数据模型URL
+                     com.alibaba.dubbo.common.URL url = arg0.getUrl();
+                    String extName = (url.getProtocol() == null ? "dubbo" : url.getProtocol());
+
+                    // 从统一数据模型URL获取协议，协议名就是spi扩展点实现类的key
+                     if (extName == null)
+                             throw new IllegalStateException("Fail to getextension(com.alibaba.dubbo.rpc.Protocol) "
+                                        + "name from url(" + url.toString() + ") usekeys([protocol])");
+
+                     // 利用dubbo服务查找机制根据名称找到具体的扩展点实现
+                     com.alibaba.dubbo.rpc.Protocol extension = (com.alibaba.dubbo.rpc.Protocol)
+                                     ExtensionLoader.getExtensionLoader(com.alibaba.dubbo.rpc.Protocol.class).getExtension(extName);
+
+                    // 调具体扩展点的方法
+                    return extension.export(arg0);
+                 }
+
+            // 接口中refer方法打上@Adaptive注册
+             public com.alibaba.dubbo.rpc.Invoker refer(java.lang.Class arg0, com.alibaba.dubbo.common.URL arg1) {
+
+                     // 统一数据模型URL不能为空
+                     if (arg1 == null)
+                             throw new IllegalArgumentException("url == null");
+
+                    com.alibaba.dubbo.common.URL url = arg1;
+
+                     // 从统一数据模型URL获取协议，协议名就是spi扩展点实现类的key
+                     String extName = (url.getProtocol() == null ? "dubbo" : url.getProtocol());
+                     if (extName == null)
+                             throw new IllegalStateException("Fail to get extension(com.alibaba.dubbo.rpc.Protocol) "
+                                         + "name from url(" + url.toString() + ") use keys([protocol])");
+
+                     // 利用dubbo服务查找机制根据名称找到具体的扩展点实现
+                     com.alibaba.dubbo.rpc.Protocol extension = (com.alibaba.dubbo.rpc.Protocol)
+                                     ExtensionLoader.getExtensionLoader(com.alibaba.dubbo.rpc.Protocol.class).getExtension(extName);
+                     // 调具体扩展点的方法
+
+                     return extension.refer(arg0, arg1);
+
+                }
+
+         }*/
 //================================================
 
     private String createAdaptiveExtensionClassCode() {
