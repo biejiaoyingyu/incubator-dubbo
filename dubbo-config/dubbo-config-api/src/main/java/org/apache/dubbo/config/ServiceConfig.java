@@ -737,10 +737,12 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
             */
         URL url = new URL(name, host, port, (contextPath == null || contextPath.length() == 0 ? "" : contextPath + "/") + path, map);
 
-        if (ExtensionLoader.getExtensionLoader(ConfiguratorFactory.class)
-                .hasExtension(url.getProtocol())) {
-            url = ExtensionLoader.getExtensionLoader(ConfiguratorFactory.class)
-                    .getExtension(url.getProtocol()).getConfigurator(url).configure(url);
+
+        /**
+         * 为什么要去获取扩展点的？
+         */
+        if (ExtensionLoader.getExtensionLoader(ConfiguratorFactory.class).hasExtension(url.getProtocol())) {
+            url = ExtensionLoader.getExtensionLoader(ConfiguratorFactory.class).getExtension(url.getProtocol()).getConfigurator(url).configure(url);
         }
 
         /**
@@ -864,6 +866,11 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                          * Dubbo协议默认的协议层面的过滤器代理实现为：com.alibaba.dubbo.rpc.protocol.ProtocolListenerWrapper,SPI定义文件见：
                          * dubbo-rpc-api/src/main/resources/METAINF/dubbo/internal/com.alibaba.dubbo.rpc.Protocol：
                          */
+
+                        //export属性：值为服务提供者的URL，为什么需要关注这个URL呢？
+                        // protocol属性为Protocol$Adaptive，Dubbo在加载组件实现类时采用SPI
+                        // (插件机制，有关于插件机制，在该专题后续文章将重点分析)，在这里我们只需要知道，
+                        // 根据URL冒号之前的协议名将会调用相应的方法。
                         Exporter<?> exporter = protocol.export(wrapperInvoker);
                         //将创建的exporter放进链表便于管理
                         exporters.add(exporter);

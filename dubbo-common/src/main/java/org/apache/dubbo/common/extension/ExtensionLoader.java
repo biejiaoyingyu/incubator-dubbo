@@ -577,6 +577,17 @@ public class ExtensionLoader<T> {
             throw findException(name);
         }
         try {
+            /**
+             * Dubbo是如何自动的给扩展点wrap上装饰对象的呢？
+
+             * 1）在ExtensionLoader.loadFile加载扩展点配置文件的时候
+
+             * 对扩展点类有接口类型为参数的构造器就是包转对象，缓存到集合中去
+
+             * 2）在调ExtensionLoader的createExtension(name)根据扩展点key创建扩展的时候， 先实例化扩展点的实现，
+
+             * 在判断时候有此扩展时候有包装类缓存，有的话利用包转器增强这个扩展点实现的功能。如下图是实现流程
+             */
             T instance = (T) EXTENSION_INSTANCES.get(clazz);
             if (instance == null) {
                 EXTENSION_INSTANCES.putIfAbsent(clazz, clazz.newInstance());
@@ -608,6 +619,9 @@ public class ExtensionLoader<T> {
     /**
      * 而这里 injectExtension 类，则是为生成的 instance 注入变量；
      * 其目标是搜索所有 set 开头，同时只有一个入参的函数，执行该函数，对变量进行注入；
+     *
+     * 内部实现了个简单的ioc机制来实现对扩展实现所依赖的参数的注入，dubbo对扩展实现中公有的set方法且入参个数为一个的方法，
+     * 尝试从对象工厂ObjectFactory获取值注入到扩展点实现中去。
      * @param instance
      * @return
      */

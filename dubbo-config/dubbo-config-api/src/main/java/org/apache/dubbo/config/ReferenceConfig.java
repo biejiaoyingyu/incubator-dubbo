@@ -226,7 +226,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         }
         //如果是泛接口那么interface的类型是GenericService
         /**
-         * 如果使用返回(泛型？)引用，将interface值替换为GenericService全路径名，如果不是，则加载interfacename，
+         * 如果使用返回引用，将interface值替换为GenericService全路径名，如果不是，则加载interfacename，
          * 并检验dubbo:reference子标签dubbo:method引用的方法是否在interface指定的接口中存在。
          */
         if (ProtocolUtils.isGeneric(getGeneric())) {
@@ -427,7 +427,10 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         /**
          * 将消息消费者缓存在ApplicationModel中
          */
+        // 获取唯一服务名称（由group分组、接口名称和版本拼接而成），创建consumer模型
         ConsumerModel consumerModel = new ConsumerModel(getUniqueServiceName(), this, ref, interfaceClass.getMethods());
+        // 添加唯一服务名称和consumer模型的映射
+        //https://blog.csdn.net/heroqiang/article/details/82882073
         ApplicationModel.initConsumerModel(getUniqueServiceName(), consumerModel);
     }
 

@@ -312,6 +312,7 @@ public class RegistryProtocol implements Protocol {
     @SuppressWarnings("unchecked")
     public <T> Invoker<T> refer(Class<T> type, URL url) throws RpcException {
         url = url.setProtocol(url.getParameter(Constants.REGISTRY_KEY, Constants.DEFAULT_REGISTRY)).removeParameter(Constants.REGISTRY_KEY);
+        // // 获取注册中心对象
         Registry registry = registryFactory.getRegistry(url);
         if (RegistryService.class.equals(type)) {
             return proxyFactory.getInvoker((T) registry, type, url);
@@ -321,11 +322,14 @@ public class RegistryProtocol implements Protocol {
         Map<String, String> qs = StringUtils.parseQueryString(url.getParameterAndDecoded(Constants.REFER_KEY));
         String group = qs.get(Constants.GROUP_KEY);
         if (group != null && group.length() > 0) {
+            //// 多个分组或者是通配符分组的处理
             if ((Constants.COMMA_SPLIT_PATTERN.split(group)).length > 1
                     || "*".equals(group)) {
+                  /* 关联服务引用 */
                 return doRefer(getMergeableCluster(), registry, type, url);
             }
         }
+          /* 关联服务引用 */
         return doRefer(cluster, registry, type, url);
     }
 
@@ -388,6 +392,7 @@ public class RegistryProtocol implements Protocol {
          */
         if (!Constants.ANY_VALUE.equals(url.getServiceInterface())
                 && url.getParameter(Constants.REGISTER_KEY, true)) {
+            // 注册中心注册成为消费者
             registry.register(subscribeUrl.addParameters(Constants.CATEGORY_KEY, Constants.CONSUMERS_CATEGORY,
                     Constants.CHECK_KEY, String.valueOf(false)));
         }
@@ -406,12 +411,16 @@ public class RegistryProtocol implements Protocol {
          * side=consumer&
          * timestamp=1528380277185
          */
+
+
         directory.subscribe(subscribeUrl.addParameter(Constants.CATEGORY_KEY,
                 Constants.PROVIDERS_CATEGORY
                         + "," + Constants.CONFIGURATORS_CATEGORY
                         + "," + Constants.ROUTERS_CATEGORY));
-
+        // 多分组为MergeableCluster，单分组默认为FailoverCluster
+        // 分别返回的Invoker就是MergeableClusterInvoker和FailoverClusterInvoker
         Invoker invoker = cluster.join(directory);
+         /* 注册consumer */
         ProviderConsumerRegTable.registerConsumer(invoker, url, subscribeUrl, directory);
         return invoker;
     }

@@ -36,6 +36,22 @@ import java.util.List;
  * /dubbo-common/src/main/resources/META-INF/dubbo/internal/com.alibaba.dubbo.common.extension.ExtensionFactory
  * /dubbo-config-spring/src/main/resources/META-INF/dubbo/internal/com.alibaba.dubbo.common.extension.ExtensionFactory
  *
+ *
+ * ObjectFactory也是基于dubbo的spi扩展机制的
+ * 它跟Compiler接口一样设配类注解@Adaptive是打在类AdaptiveExtensionFactory上的不是通过javassist编译生成的。
+
+ AdaptiveExtensionFactory持有所有ExtensionFactory对象的集合，dubbo内部默认实现的对象工厂是SpiExtensionFactory和SrpingExtensionFactory，
+
+ 他们经过TreeMap排好序的查找顺序是优先先从SpiExtensionFactory获取，如果返回空在从SpringExtensionFactory获取。
+
+ 1） SpiExtensionFactory工厂获取要被注入的对象，就是要获取dubbo spi扩展的实现，
+
+ 　　所以传入的参数类型必须是接口类型并且接口上打上了@SPI注解，返回的是一个设配类对象。
+
+ 2） SpringExtensionFactory，Dubbo利用spring的扩展机制跟spring做了很好的融合。在发布或者去
+ 引用一个服务的时候，会把spring的容器添加到SpringExtensionFactory工厂集合中去，
+ 当SpiExtensionFactory没有获取到对象的时候会遍历SpringExtensionFactory中的spring容器来获取要注入的对象
+ *
  */
 @Adaptive
 public class AdaptiveExtensionFactory implements ExtensionFactory {
