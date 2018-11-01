@@ -40,6 +40,7 @@ public class ZkclientZookeeperClient extends AbstractZookeeperClient<IZkChildLis
         super(url);
         long timeout = url.getParameter(Constants.TIMEOUT_KEY, 30000L);
         client = new ZkClientWrapper(url.getBackupAddress(), timeout);
+        /* 构建ZkClientWrapper，可以在连接超时后自动监控连接的状态 */
         client.addListener(new IZkStateListener() {
             @Override
             public void handleStateChanged(KeeperState state) throws Exception {
@@ -56,6 +57,7 @@ public class ZkclientZookeeperClient extends AbstractZookeeperClient<IZkChildLis
                 stateChanged(StateListener.RECONNECTED);
             }
         });
+        /* 开启线程，连接zookeeper */
         client.start();
     }
 
@@ -71,6 +73,7 @@ public class ZkclientZookeeperClient extends AbstractZookeeperClient<IZkChildLis
     @Override
     public void createEphemeral(String path) {
         try {
+            	/* 创建临时节点 */
             client.createEphemeral(path);
         } catch (ZkNodeExistsException e) {
         }

@@ -78,7 +78,16 @@ public abstract class AbstractRegistry implements Registry {
     public AbstractRegistry(URL url) {
         setUrl(url);
         // Start file save timer
+        // 是否同步保存文件，默认false
         syncSaveFile = url.getParameter(Constants.REGISTRY_FILESAVE_SYNC_KEY, false);
+        // 配置缓存文件，默认在用户根目录/.duboo文件夹下
+        /**
+         * 这里提到了缓存文件，简单来说它就是用来做容灾的，consumer从注册中心订阅了provider等信息后会缓存到本地文件中，
+         * 这样当注册中心不可用时，consumer启动时就可以加载这个缓存文件里面的内容与provider进行交互，这样就可以不依赖注
+         * 册中心，但是无法获取到新的provider变更通知，所以如果provider信息在注册中心不可用这段时间发生了很大变化，那
+         * 就很可能会出现服务无法调用的情况，在2.5.7（记得是这个版本）版本之前，dubbo有一个bug，如果启动时注册中心连接
+         * 不上，启动程序会hang住，无法启动，所以在2.5.7版本之前这个文件是没用的，在2.5.7版本进行了修复。
+         */
         String filename = url.getParameter(Constants.FILE_KEY, System.getProperty("user.home") + "/.dubbo/dubbo-registry-" + url.getParameter(Constants.APPLICATION_KEY) + "-" + url.getAddress() + ".cache");
         File file = null;
         if (ConfigUtils.isNotEmpty(filename)) {
@@ -90,7 +99,9 @@ public abstract class AbstractRegistry implements Registry {
             }
         }
         this.file = file;
+        // 将缓存文件加载成为Properties
         loadProperties();
+        // 通知更新配置
         notify(url.getBackupUrls());
     }
 
@@ -148,8 +159,9 @@ public abstract class AbstractRegistry implements Registry {
         }
         // Save
         try {
-            File lockfile = new File(file.getAbsolutePath() + ".lock");
+            File lockfile = new File(file.getAbsolutePath() + ".lock");// 文件锁
             if (!lockfile.exists()) {
+                // 锁文件不存在则创建新的锁文件
                 lockfile.createNewFile();
             }
             RandomAccessFile raf = new RandomAccessFile(lockfile, "rw");
@@ -163,10 +175,12 @@ public abstract class AbstractRegistry implements Registry {
                     // Save
                     try {
                         if (!file.exists()) {
+                            // 缓存文件不存在则创建新的缓存文件
                             file.createNewFile();
                         }
                         FileOutputStream outputFile = new FileOutputStream(file);
                         try {
+                            // 保存
                             properties.store(outputFile, "Dubbo Registry Cache");
                         } finally {
                             outputFile.close();
@@ -412,7 +426,10 @@ public abstract class AbstractRegistry implements Registry {
             String category = entry.getKey();
             List<URL> categoryList = entry.getValue();
             categoryNotified.put(category, categoryList);
+            /* 更新本地文件缓存 */
             saveProperties(url);
+             /* 通知监听器 */
+             //todo:这里有个内部类监听器
             listener.notify(categoryList);
         }
     }
@@ -436,10 +453,13 @@ public abstract class AbstractRegistry implements Registry {
                 }
             }
             properties.setProperty(url.getServiceKey(), buf.toString());
+            // 增加缓存更新次数计数
             long version = lastCacheChanged.incrementAndGet();
             if (syncSaveFile) {
+                /* 同步刷新文件缓存 */
                 doSaveProperties(version);
             } else {
+                /* 单线程池异步刷新文件缓存 */
                 registryCacheExecutor.execute(new SaveProperties(version));
             }
         } catch (Throwable t) {

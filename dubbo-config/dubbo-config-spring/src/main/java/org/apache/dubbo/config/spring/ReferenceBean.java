@@ -88,8 +88,8 @@ public class ReferenceBean<T> extends ReferenceConfig<T> implements FactoryBean,
     public void afterPropertiesSet() throws Exception {
         //如果Consumer还未注册
         /**
-         * 如果consumer为空，说明dubbo:reference标签未设置consumer属性，如果一个dubbo:consumer标签，
-         * 则取该实例，如果存在多个dubbo:consumer 配置，则consumer必须设置，否则会抛出异常：”Duplicate consumer configs”。
+         * 如果consumer为空，说明dubbo:reference标签未设置consumer属性，如果只有一个dubbo:consumer标签，
+         * 则取该实例，如果存在多个dubbo:consumer 配置，则consumer属性必须设置，否则会抛出异常：”Duplicate consumer configs”。
          */
         if (getConsumer() == null) {
             //获取applicationContext这个IOC容器实例中的所有ConsumerConfig

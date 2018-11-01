@@ -26,6 +26,8 @@ import java.lang.reflect.Method;
 
 /**
  * InvokerHandler
+ * 我们看到了关联服务引用创建代理的过程，最终会调用JavassistProxyFactory的getProxy方法来创建代理，并用InvokerInvocationHandler对Invoker进行了包装，
+ * InvokerInvocationHandler实现了JDK的InvocationHandler，这个接口相信熟悉JDK动态代理的同学一定不陌生，所以我们在调用服务的方法时就会调用其invoke方法
  */
 public class InvokerInvocationHandler implements InvocationHandler {
 
@@ -67,6 +69,7 @@ public class InvokerInvocationHandler implements InvocationHandler {
                 invocation.setAttachment(Constants.ASYNC_KEY, "true");
             }
         }
+          /* 将方法和参数封装到RpcInvocation中，调用Invoker的invoke方法 */
         return invoker.invoke(invocation).recreate();
     }
 

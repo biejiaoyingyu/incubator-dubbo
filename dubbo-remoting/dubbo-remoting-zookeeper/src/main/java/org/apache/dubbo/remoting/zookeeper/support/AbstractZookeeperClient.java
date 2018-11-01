@@ -52,6 +52,7 @@ public abstract class AbstractZookeeperClient<TargetChildListener> implements Zo
 
     @Override
     public void create(String path, boolean ephemeral) {
+        //判断是否存在
         if (!ephemeral) {
             if (checkExists(path)) {
                 return;
@@ -59,11 +60,14 @@ public abstract class AbstractZookeeperClient<TargetChildListener> implements Zo
         }
         int i = path.lastIndexOf('/');
         if (i > 0) {
+            // 递归创建父节点
             create(path.substring(0, i), false);
         }
         if (ephemeral) {
+            /* 创建临时节点 */
             createEphemeral(path);
         } else {
+             /* 创建持久节点 */
             createPersistent(path);
         }
     }

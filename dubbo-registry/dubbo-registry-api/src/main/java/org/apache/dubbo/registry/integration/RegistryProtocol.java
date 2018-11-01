@@ -174,7 +174,9 @@ public class RegistryProtocol implements Protocol {
         // Subscribe the override data
         // FIXME When the provider subscribes, it will affect the scene : a certain JVM exposes the service and call the same service. Because the subscribed is cached key with the name of the service, it causes the subscription information to cover.
         /**
-         * 服务提供者向注册中心订阅自己，主要是为了服务提供者URL发送变化后重新暴露服务，当然，会将dubbo:reference的check属性设置为false。
+         * 服务提供者向注册中心订阅自己，主要是为了服务提供者URL发送变化后重新暴露服务，(todo：重要=====>动态的)
+         *
+         * 当然，会将dubbo:reference的check属性设置为false。
          */
         final URL overrideSubscribeUrl = getSubscribedOverrideUrl(registeredProviderUrl);
         final OverrideListener overrideSubscribeListener = new OverrideListener(overrideSubscribeUrl, originInvoker);
@@ -275,9 +277,11 @@ public class RegistryProtocol implements Protocol {
     }
 
     private URL getSubscribedOverrideUrl(URL registedProviderUrl) {
-        return registedProviderUrl.setProtocol(Constants.PROVIDER_PROTOCOL)
-                .addParameters(Constants.CATEGORY_KEY, Constants.CONFIGURATORS_CATEGORY,
-                        Constants.CHECK_KEY, String.valueOf(false));
+        return registedProviderUrl.setProtocol(
+                Constants.PROVIDER_PROTOCOL).addParameters(Constants.CATEGORY_KEY,
+                Constants.CONFIGURATORS_CATEGORY,
+                Constants.CHECK_KEY,
+                String.valueOf(false));
     }
 
     /**
@@ -323,13 +327,12 @@ public class RegistryProtocol implements Protocol {
         String group = qs.get(Constants.GROUP_KEY);
         if (group != null && group.length() > 0) {
             //// 多个分组或者是通配符分组的处理
-            if ((Constants.COMMA_SPLIT_PATTERN.split(group)).length > 1
-                    || "*".equals(group)) {
+            if ((Constants.COMMA_SPLIT_PATTERN.split(group)).length > 1 || "*".equals(group)) {
                   /* 关联服务引用 */
                 return doRefer(getMergeableCluster(), registry, type, url);
             }
         }
-          /* 关联服务引用 */
+          /* 关联服务引用 ---->todo：见下面，集群策略*/
         return doRefer(cluster, registry, type, url);
     }
 
@@ -347,7 +350,8 @@ public class RegistryProtocol implements Protocol {
      */
     private <T> Invoker<T> doRefer(Cluster cluster, Registry registry, Class<T> type, URL url) {
         /**
-         * 构建RegistryDirectory对象，基于注册中心动态发现服务提供者（服务提供者新增或减少），本节重点会剖析该类的实现细节。
+         * 构建RegistryDirectory对象，基于注册中心动态发现服务提供者（服务提供者新增或减少）
+         * todo：重点是RegistryDirectory
          */
         RegistryDirectory<T> directory = new RegistryDirectory<T>(type, url);
         /**
@@ -390,15 +394,13 @@ public class RegistryProtocol implements Protocol {
          * side=consumer&
          * timestamp=1528380277185
          */
-        if (!Constants.ANY_VALUE.equals(url.getServiceInterface())
-                && url.getParameter(Constants.REGISTER_KEY, true)) {
+        if (!Constants.ANY_VALUE.equals(url.getServiceInterface()) && url.getParameter(Constants.REGISTER_KEY, true)) {
             // 注册中心注册成为消费者
-            registry.register(subscribeUrl.addParameters(Constants.CATEGORY_KEY, Constants.CONSUMERS_CATEGORY,
-                    Constants.CHECK_KEY, String.valueOf(false)));
+            registry.register(subscribeUrl.addParameters(Constants.CATEGORY_KEY, Constants.CONSUMERS_CATEGORY, Constants.CHECK_KEY, String.valueOf(false)));
         }
         /**
-         * 为消息消费者添加category=providers,configurators,routers属性后，然后向注册中心订阅该URL，关注该服务下的
-         * providers,configurators,routers发生变化时通知RegistryDirectory，以便及时发现服务提供者、配置、路由规则的变化。
+         * 为消息消费者添加category=providers,configurators,routers属性后，TODO:然后向注册中心订阅该URL，关注该服务下的
+         * todo：providers,configurators,routers发生变化时通知RegistryDirectory，以便及时发现服务提供者、配置、路由规则的变化。
          * consumer://192.168.56.1/com.alibaba.dubbo.demo.DemoService?
          * application=demo-consumer&
          * category=providers,configurators,routers&
@@ -411,12 +413,8 @@ public class RegistryProtocol implements Protocol {
          * side=consumer&
          * timestamp=1528380277185
          */
-
-
         directory.subscribe(subscribeUrl.addParameter(Constants.CATEGORY_KEY,
-                Constants.PROVIDERS_CATEGORY
-                        + "," + Constants.CONFIGURATORS_CATEGORY
-                        + "," + Constants.ROUTERS_CATEGORY));
+                Constants.PROVIDERS_CATEGORY + "," + Constants.CONFIGURATORS_CATEGORY + "," + Constants.ROUTERS_CATEGORY));
         // 多分组为MergeableCluster，单分组默认为FailoverCluster
         // 分别返回的Invoker就是MergeableClusterInvoker和FailoverClusterInvoker
         Invoker invoker = cluster.join(directory);
@@ -472,7 +470,9 @@ public class RegistryProtocol implements Protocol {
         }
 
         /**
-         * @param urls The list of registered information , is always not empty, The meaning is the same as the return value of {@link org.apache.dubbo.registry.RegistryService#lookup(URL)}.
+         * todo:这个监听器是用于服务变化重新暴露服务
+         * @param urls The list of registered information , is always not empty, The meaning is the same as the return value of
+         * {@link org.apache.dubbo.registry.RegistryService#lookup(URL)}.
          */
         @Override
         public synchronized void notify(List<URL> urls) {
@@ -483,7 +483,7 @@ public class RegistryProtocol implements Protocol {
             if (matchedUrls.isEmpty()) {
                 return;
             }
-
+            // 转换覆盖url以便在重新引用时使用，每次发送所有规则，url将被重新组合和计算
             List<Configurator> configurators = RegistryDirectory.toConfigurators(matchedUrls);
 
             final Invoker<?> invoker;
@@ -493,6 +493,7 @@ public class RegistryProtocol implements Protocol {
                 invoker = originInvoker;
             }
             //The origin invoker
+            // 原invoker url
             URL originUrl = RegistryProtocol.this.getProviderUrl(invoker);
             String key = getCacheKey(originInvoker);
             ExporterChangeableWrapper<?> exporter = bounds.get(key);
@@ -501,10 +502,13 @@ public class RegistryProtocol implements Protocol {
                 return;
             }
             //The current, may have been merged many times
+
             URL currentUrl = exporter.getInvoker().getUrl();
             //Merged with this configuration
+            // 与此配置合并，产生新的url
             URL newUrl = getConfigedInvokerUrl(configurators, originUrl);
             if (!currentUrl.equals(newUrl)) {
+                // 重新暴露修改后的url的invoker
                 RegistryProtocol.this.doChangeLocalExport(originInvoker, newUrl);
                 logger.info("exported provider url changed, origin url: " + originUrl + ", old export url: " + currentUrl + ", new export url: " + newUrl);
             }

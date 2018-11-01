@@ -234,8 +234,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         } else {
             //如果不是泛接口使用interfaceName指定的泛接口
             try {
-                interfaceClass = Class.forName(interfaceName, true, Thread.currentThread()
-                        .getContextClassLoader());
+                interfaceClass = Class.forName(interfaceName, true, Thread.currentThread().getContextClassLoader());
             } catch (ClassNotFoundException e) {
                 throw new IllegalStateException(e.getMessage(), e);
             }
@@ -421,7 +420,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         StaticContext.getSystemContext().putAll(attributes);
         //在map装载了application、module、consumer、reference的所有属性信息后创建代理
         /**
-         * 调用createProxy方法创建消息消费者代理->观察细节
+         * 调用createProxy方法创建消息消费者代理----->观察细节
          */
         ref = createProxy(map);
         /**
@@ -430,7 +429,6 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         // 获取唯一服务名称（由group分组、接口名称和版本拼接而成），创建consumer模型
         ConsumerModel consumerModel = new ConsumerModel(getUniqueServiceName(), this, ref, interfaceClass.getMethods());
         // 添加唯一服务名称和consumer模型的映射
-        //https://blog.csdn.net/heroqiang/article/details/82882073
         ApplicationModel.initConsumerModel(getUniqueServiceName(), consumerModel);
     }
 
@@ -534,10 +532,10 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
             }
 
             /**
-             * 根据URL获取对应协议的Invoker。
+             * 根据URL获取对应协议的Invoker。================>生产情况是动态的啊？？？
              */
             if (urls.size() == 1) {
-                //此处举例说明如果是Dubbo协议则调用DubboProtocol的refer方法生成invoker，
+                // 此处举例说明如果是Dubbo协议则调用DubboProtocol的refer方法生成invoker，
                 // 当用户调用service接口实际调用的是invoker的invoke方法
 
                 /**

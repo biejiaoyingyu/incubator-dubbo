@@ -44,6 +44,7 @@ public class ZkClientWrapper {
 
     public ZkClientWrapper(final String serverAddr, long timeout) {
         this.timeout = timeout;
+        // 创建任务创建ZkClient
         completableFuture = CompletableFuture.supplyAsync(() -> new ZkClient(serverAddr, Integer.MAX_VALUE));
     }
 
@@ -83,6 +84,7 @@ public class ZkClientWrapper {
 
     public void createEphemeral(String path) {
         Assert.notNull(client, new IllegalStateException("Zookeeper is not connected yet!"));
+        // 调用ZkClient的createEphemeral方法创建临时节点
         client.createEphemeral(path);
     }
 

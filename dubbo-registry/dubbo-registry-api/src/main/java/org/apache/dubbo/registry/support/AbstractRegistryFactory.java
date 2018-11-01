@@ -34,6 +34,9 @@ import java.util.concurrent.locks.ReentrantLock;
  * AbstractRegistryFactory. (SPI, Singleton, ThreadSafe)
  *
  * @see org.apache.dubbo.registry.RegistryFactory
+ * 我们可以选择Redis、数据库、Zookeeper作为Dubbo的注册中心，Dubbo推荐用户使用Zookeeper作为注册中心，
+ * 在provider和consumer的初始化过程中，我们看到了dubbo通过调用RegistryFactory的getRegistry方法来
+ * 获取注册中心实例，
  */
 public abstract class AbstractRegistryFactory implements RegistryFactory {
 
@@ -80,6 +83,11 @@ public abstract class AbstractRegistryFactory implements RegistryFactory {
         }
     }
 
+    /**
+     * todo:注册中心的相关流程
+     * @param url Registry address, is not allowed to be empty
+     * @return
+     */
     @Override
     public Registry getRegistry(URL url) {
         url = url.setPath(RegistryService.class.getName())
@@ -87,12 +95,15 @@ public abstract class AbstractRegistryFactory implements RegistryFactory {
                 .removeParameters(Constants.EXPORT_KEY, Constants.REFER_KEY);
         String key = url.toServiceString();
         // Lock the registry access process to ensure a single instance of the registry
+        // 锁定注册中心的访问过程以确保注册中心的的单个实例
         LOCK.lock();
         try {
+            // 缓存
             Registry registry = REGISTRIES.get(key);
             if (registry != null) {
                 return registry;
             }
+             /* 创建注册中心实例 */
             registry = createRegistry(url);
             if (registry == null) {
                 throw new IllegalStateException("Can not create registry " + url);

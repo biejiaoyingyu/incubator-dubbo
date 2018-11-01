@@ -35,6 +35,7 @@ public class ZookeeperRegistryFactory extends AbstractRegistryFactory {
 
     @Override
     public Registry createRegistry(URL url) {
+        /* 创建ZookeeperRegistry实例 */
         return new ZookeeperRegistry(url, zookeeperTransporter);
     }
 
