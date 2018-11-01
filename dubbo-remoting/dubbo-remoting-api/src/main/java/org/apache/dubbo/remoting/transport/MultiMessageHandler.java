@@ -31,6 +31,12 @@ public class MultiMessageHandler extends AbstractChannelHandlerDelegate {
         super(handler);
     }
 
+    /**
+     * MultiMessageHandler很好理解，就是为多条的这种消息做一个遍历。
+     * @param channel
+     * @param message
+     * @throws RemotingException
+     */
     @SuppressWarnings("unchecked")
     @Override
     public void received(Channel channel, Object message) throws RemotingException {

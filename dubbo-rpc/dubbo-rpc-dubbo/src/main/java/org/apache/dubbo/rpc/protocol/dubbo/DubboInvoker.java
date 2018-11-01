@@ -73,7 +73,7 @@ public class DubboInvoker<T> extends AbstractInvoker<T> {
         final String methodName = RpcUtils.getMethodName(invocation);
         inv.setAttachment(Constants.PATH_KEY, getUrl().getPath());
         inv.setAttachment(Constants.VERSION_KEY, version);
-
+        // 获取client，轮询
         ExchangeClient currentClient;
         if (clients.length == 1) {
             currentClient = clients[0];
@@ -84,14 +84,15 @@ public class DubboInvoker<T> extends AbstractInvoker<T> {
             /**
              * 首先获取async属性，如果为true表示异步请求，如果配置了return=”false”表示调用模式为oneway，只发调用，不关注其调用结果。
              */
-            boolean isAsync = RpcUtils.isAsync(getUrl(), invocation);
+            boolean isAsync = RpcUtils.isAsync(getUrl(), invocation);// 是否异步
             boolean isAsyncFuture = RpcUtils.isGeneratedFuture(inv) || RpcUtils.isFutureReturnType(inv);
-            boolean isOneway = RpcUtils.isOneway(getUrl(), invocation);
+            boolean isOneway = RpcUtils.isOneway(getUrl(), invocation);// 是否单双工
             int timeout = getUrl().getMethodParameter(methodName, Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);
             if (isOneway) {
                 boolean isSent = getUrl().getMethodParameter(methodName, Constants.SENT_KEY, false);
                 /**
-                 * 处理oneway的情况。如果设置了sent=true，表示等待网络数据发出才返回，如果sent=false，只是将待发送数据发到IO写缓存区就返回。
+                 * 处理oneway的情况。如果设置了sent=true，表示等待网络数据发出才返回，如果sent=false，
+                 * 只是将待发送数据发到IO写缓存区就返回。
                  */
                 currentClient.send(inv, isSent);
                 RpcContext.getContext().setFuture(null);

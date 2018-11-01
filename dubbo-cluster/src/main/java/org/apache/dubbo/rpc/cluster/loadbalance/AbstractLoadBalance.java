@@ -28,6 +28,11 @@ import java.util.List;
  * AbstractLoadBalance
  * 可以通过< dubbo:service loadbalance=”roundrobin” …/>或< dubbo:service loadbalance = “roundrobin” …/>
  * 负载均衡算法：加权轮询算法。
+ *
+ * dubbo一共支持四种负载均衡策略，RoundRobinLoadBalance（轮询）、RandomLoadBalance（随机）、
+ * LeastActiveLoadBalance（最少活跃）、ConsistentHashLoadBalance（一致性哈希）。默认为随机策略，
+ * 我门在分析consumer调用过程中invoker的选择时，看到了负载均衡策略的应用，下面我们分别来分析一下这
+ * 四种负载均衡策略的实现细节：
  */
 public abstract class AbstractLoadBalance implements LoadBalance {
 

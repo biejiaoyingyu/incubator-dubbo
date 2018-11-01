@@ -63,12 +63,14 @@ public class FailoverClusterInvoker<T> extends AbstractClusterInvoker<T> {
         /**
          * 首先校验服务提供者列表，如果为空，则抛出RpcException，提示没有可用的服务提供者。
          */
+        // 重试次数，第一次调用不算重试，所以加1
         int len = getUrl().getMethodParameter(methodName, Constants.RETRIES_KEY, Constants.DEFAULT_RETRIES) + 1;
         if (len <= 0) {
             len = 1;
         }
         // retry loop.
         RpcException le = null; // last exception.
+        // 存储已经调用过的invoker
         List<Invoker<T>> invoked = new ArrayList<Invoker<T>>(copyinvokers.size()); // invoked invokers.
         /**
          * 构建Set< Stirng> providers,主要用来已调用服务提供者的地址，如果本次调用失败，将在日志信息中打印已调用的服务提供者信息。
@@ -76,14 +78,19 @@ public class FailoverClusterInvoker<T> extends AbstractClusterInvoker<T> {
         Set<String> providers = new HashSet<String>(len);
         /**
          * 循环执行次数，等于retries + 1 次。
+         *
          */
+        // 重试循环
         for (int i = 0; i < len; i++) {
             //Reselect before retry to avoid a change of candidate `invokers`.
             //NOTE: if `invokers` changed, then `invoked` also lose accuracy.
             /**
              * 如果i>0，表示服务调用，在重试，此时需要重新调用Directory#list方法，获取最小的服务提供者列表。
              */
+            // 在重试之前重新选择以避免候选invokers的更改
+            // 注意：如果invokers改变了，那么invoked集合也会失去准确性
             if (i > 0) {
+                // 重复第一次调用的几个步骤
                 checkWhetherDestroyed();
                 copyinvokers = list(invocation);
                 // check again

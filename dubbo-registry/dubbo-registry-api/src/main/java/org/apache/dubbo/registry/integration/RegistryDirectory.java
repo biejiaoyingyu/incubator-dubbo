@@ -820,10 +820,12 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
          * 根据方法名称，从Map< String,List< Invoker>>这个集合中找到合适的List< Invoker>，如果方法名未命中，
          * 则返回所有的Invoker，localMethodInvokerMap中方法名，主要是dubbo:service的子标签dubbo:method，最终返回invokers。
          */
+        // 这里的methodInvokerMap在consumer初始化时订阅注册中心的providers、configuration等相关信息时收到通知时初始化
         Map<String, List<Invoker<T>>> localMethodInvokerMap = this.methodInvokerMap; // local reference
         if (localMethodInvokerMap != null && localMethodInvokerMap.size() > 0) {
             String methodName = RpcUtils.getMethodName(invocation);
             Object[] args = RpcUtils.getArguments(invocation);
+            // 依次采用不同的方式从map中获取invoker
             if (args != null && args.length > 0 && args[0] != null
                     && (args[0] instanceof String || args[0].getClass().isEnum())) {
                 invokers = localMethodInvokerMap.get(methodName + "." + args[0]); // The routing can be enumerated according to the first parameter

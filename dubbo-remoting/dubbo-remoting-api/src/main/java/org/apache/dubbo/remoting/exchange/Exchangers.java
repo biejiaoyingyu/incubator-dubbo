@@ -114,6 +114,7 @@ public class Exchangers {
             throw new IllegalArgumentException("handler == null");
         }
         url = url.addParameterIfAbsent(Constants.CODEC_KEY, "exchange");
+         /* 建立连接 */
         return getExchanger(url).connect(url, handler);
     }
 

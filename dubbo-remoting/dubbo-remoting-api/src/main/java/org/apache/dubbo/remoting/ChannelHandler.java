@@ -52,6 +52,7 @@ public interface ChannelHandler {
 
     /**
      * on message received.
+     * MULTI-
      * 当读事件触发时执行该方法，服务端在收到客户端的请求数据是，调用该方法执行解包等操作。
      * @param channel channel.
      * @param message message.

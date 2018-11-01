@@ -83,12 +83,22 @@ public class NettyHandler extends SimpleChannelHandler {
         }
     }
 
+    /**
+     * 在NettyHandler调用之前，请求首先会经过编码器和解码器进行编码和解码，编解码的过程我们会用单独的文章进行分析。
+     * NettyHandler继承了netty的SimpleChannelHandler，通过覆盖SimpleChannelHandler的相关方法来处理相关事件，
+     * provider在收到服务调用请求时会触发messageReceived事件
+     * @param ctx
+     * @param e
+     * @throws Exception
+     */
     @Override
     public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) throws Exception {
+        // 连接成功后添加netty的Channel和dubbo的NettyChannel之间的映射关系
         NettyChannel channel = NettyChannel.getOrAddChannel(ctx.getChannel(), url, handler);
         try {
             handler.received(channel, e.getMessage());
         } finally {
+            // 如果连接断开，移除netty的Channel和dubbo的NettyChannel之间的映射关系
             NettyChannel.removeChannelIfDisconnected(ctx.getChannel());
         }
     }

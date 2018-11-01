@@ -126,6 +126,7 @@ public class NettyClient extends AbstractClient {
         /**
          * 调用bootstrap.connect方法发起TCP连接。
          */
+        // 获取连接地址建立连接
         ChannelFuture future = bootstrap.connect(getConnectAddress());
         try {
 
@@ -138,6 +139,7 @@ public class NettyClient extends AbstractClient {
                 Channel newChannel = future.channel();
                 try {
                     // Close old channel
+                    // 关闭旧的channel
                     Channel oldChannel = NettyClient.this.channel; // copy reference
                     if (oldChannel != null) {
                         try {
@@ -150,6 +152,7 @@ public class NettyClient extends AbstractClient {
                         }
                     }
                 } finally {
+                    // 如果client关闭了，则新的channel也要关闭
                     if (NettyClient.this.isClosed()) {
                         try {
                             if (logger.isInfoEnabled()) {

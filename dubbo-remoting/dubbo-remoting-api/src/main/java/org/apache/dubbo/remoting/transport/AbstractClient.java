@@ -136,6 +136,7 @@ public abstract class AbstractClient extends AbstractEndpoint implements Client 
              * 调用connect方法，向服务端发起TCP连接。
              */
             // connect.
+            //todo:enter
             connect();
             if (logger.isInfoEnabled()) {
                 logger.info("Start " + getClass().getSimpleName() + " " + NetUtils.getLocalAddress() + " connect to the server " + getRemoteAddress());
@@ -201,11 +202,13 @@ public abstract class AbstractClient extends AbstractEndpoint implements Client 
         //reconnect=false to close reconnect
         int reconnect = getReconnectParam(getUrl());
         if (reconnect > 0 && (reconnectExecutorFuture == null || reconnectExecutorFuture.isCancelled())) {
+            // 重连任务
             Runnable connectStatusCheckCommand = new Runnable() {
                 @Override
                 public void run() {
                     try {
                         if (!isConnected()) {
+                            // 建立连接
                             connect();
                         } else {
                             lastConnectedTime = System.currentTimeMillis();
@@ -213,6 +216,7 @@ public abstract class AbstractClient extends AbstractEndpoint implements Client 
                     } catch (Throwable t) {
                         String errorMsg = "client reconnect to " + getUrl().getAddress() + " find error . url: " + getUrl();
                         // wait registry sync provider list
+                        // 等待注册中心同步provider列表
                         if (System.currentTimeMillis() - lastConnectedTime > shutdown_timeout) {
                             if (!reconnect_error_log_flag.get()) {
                                 reconnect_error_log_flag.set(true);
@@ -226,6 +230,7 @@ public abstract class AbstractClient extends AbstractEndpoint implements Client 
                     }
                 }
             };
+            // 固定间隔执行重连任务
             reconnectExecutorFuture = reconnectExecutorService.scheduleWithFixedDelay(connectStatusCheckCommand, reconnect, reconnect, TimeUnit.MILLISECONDS);
         }
     }
@@ -324,7 +329,10 @@ public abstract class AbstractClient extends AbstractEndpoint implements Client 
             if (isConnected()) {
                 return;
             }
+             /* 初始化重连线程 */
+             //todo:enter
             initConnectStatusCheckCommand();
+            /* 连接操作 */
             doConnect();
             if (!isConnected()) {
                 throw new RemotingException(this, "Failed connect to server " + getRemoteAddress() + " from " + getClass().getSimpleName() + " "
