@@ -81,11 +81,15 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
     private final List<URL> urls = new ArrayList<URL>();
     private final List<Exporter<?>> exporters = new ArrayList<Exporter<?>>();
     // interface type
+    //todo:com.cxf.dubbo.service.BikeService
     private String interfaceName;
+    //todo:接口类型 com.cxf.dubbo.service.BikeService
     private Class<?> interfaceClass;
     // reference to interface impl
+    //todo:引用的实现类
     private T ref;
     // service name
+    //todo:默认为接口名===>com.cxf.dubbo.service.BikeService
     private String path;
     // method configuration
     private List<MethodConfig> methods;
@@ -477,6 +481,14 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
          * registry=zookeeper&
          * timestamp=1524134852031
          */
+
+        //registry://192.168.120.18:2181/com.alibaba.dubbo.registry.RegistryService?
+        // application=dubboProvider&
+        // client=zkclient&
+        // dubbo=2.6.0&
+        // pid=4640&
+        // registry=zookeeper&
+        // timestamp=1541149035777
         List<URL> registryURLs = loadRegistries(true);
         /**
          * 然后遍历配置的所有协议，根据每个协议，向注册中心暴露服务，接下来重点分析doExportUrlsFor1Protocol方法的实现细节。
@@ -490,7 +502,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
     }
 
     private void doExportUrlsFor1Protocol(ProtocolConfig protocolConfig, List<URL> registryURLs) {
-        //如果没配置protocol则默认使用dubbo协议
+        //如果没配置protocol则默认使用dubbo协议，获取协议名称
         String name = protocolConfig.getName();
         if (name == null || name.length() == 0) {
             name = "dubbo";

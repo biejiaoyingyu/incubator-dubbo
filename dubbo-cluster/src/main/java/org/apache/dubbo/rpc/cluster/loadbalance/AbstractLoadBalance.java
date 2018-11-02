@@ -46,13 +46,13 @@ public abstract class AbstractLoadBalance implements LoadBalance {
         if (invokers == null || invokers.isEmpty()) {
             return null;
         }
+        // 如果invoker集合中只有一个，直接返回第一个
         if (invokers.size() == 1) {
             return invokers.get(0);
         }
+          /* 子类实现负载均衡选择invoker */
         return doSelect(invokers, url, invocation);
     }
-
-    protected abstract <T> Invoker<T> doSelect(List<Invoker<T>> invokers, URL url, Invocation invocation);
 
     protected int getWeight(Invoker<?> invoker, Invocation invocation) {
         int weight = invoker.getUrl().getMethodParameter(invocation.getMethodName(), Constants.WEIGHT_KEY, Constants.DEFAULT_WEIGHT);
@@ -68,5 +68,7 @@ public abstract class AbstractLoadBalance implements LoadBalance {
         }
         return weight;
     }
+
+    protected abstract <T> Invoker<T> doSelect(List<Invoker<T>> invokers, URL url, Invocation invocation);
 
 }
