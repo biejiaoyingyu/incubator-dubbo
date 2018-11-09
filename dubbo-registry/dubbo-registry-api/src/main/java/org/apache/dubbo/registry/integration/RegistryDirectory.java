@@ -166,6 +166,7 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
     public RegistryDirectory(Class<T> serviceType, URL url) {
         super(url);
         if (serviceType == null) {
+
             throw new IllegalArgumentException("service type is null.");
         }
         if (url.getServiceKey() == null || url.getServiceKey().length() == 0) {
