@@ -89,7 +89,7 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
         //=====================
         String id = element.getAttribute("id");
 
-        //1.如果没有设置bean的id(一般dubbo标签都不会配置id属性和requied属性),required默认为true
+        //1.如果没有设置bean的id(一般dubbo标签都不会配置id属性和requied属性),required默认为==>传进来的方法参数true
         //<dubbo:reference id = "必填"，interface="必填" 无name属性>
 
         if ((id == null || id.length() == 0) && required) {
@@ -116,7 +116,7 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
             // com.alibaba.dubbo.config.ProviderConfig  <dubbo:provider id = "可选" 没有name属性  >
             // com.alibaba.dubbo.config.ConsumerConfig <dubbo:consumer 没有id，name，interface>
             if (generatedBeanName == null || generatedBeanName.length() == 0) {
-                generatedBeanName = beanClass.getName();
+                generatedBeanName = beanClass.getName();//如=====>com.alibaba.dubbo.config.RegistryConfig所以多个注册中心需要为每个注册中心取id
             }
             //如果id没有设置那么 id=generatedBeanName,如果是ProtocolConfig类型的话自然就是 协议名默认dubbo
             id = generatedBeanName;
@@ -182,7 +182,7 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
                          *
                          *
                          */
-                        //给这定义信息添加依赖bean
+                        //给这定义信息添加依赖bean====>后面的标签有protocol属性怎么办？
                         definition.getPropertyValues().addPropertyValue("protocol", new RuntimeBeanReference(id));
                     }
                 }
@@ -223,17 +223,24 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
              */
             parseNested(element, parserContext, ReferenceBean.class, false, "reference", "consumer", id, beanDefinition);
         }
+        //存储对象的所有属性
         Set<String> props = new HashSet<String>();
         ManagedMap parameters = null;
-        // 遍历beanClass的方法
+        // 遍历beanClass的public方法(这种做法包括继承的方法)
+
         for (Method setter : beanClass.getMethods()) {
             String name = setter.getName();
             //给model注入值时,如ServiceConfig,// 判断是否是public的有参数的setter方法
+            //=========================
+            //下面是利用反射截取对象的属性
+            //=========================
             if (name.length() > 3 && name.startsWith("set") && Modifier.isPublic(setter.getModifiers()) && setter.getParameterTypes().length == 1) {
                 //方法参数类型，因为参数只能是1，所以直接取[0]
                 Class<?> type = setter.getParameterTypes()[0];
                 // 将setter驼峰命名去掉set后转成-连接的命名，如setApplicationContext --> application-context
                 String property = StringUtils.camelToSplitName(name.substring(3, 4).toLowerCase() + name.substring(4), "-");
+
+
                 props.add(property);
                 Method getter = null;
                 try {
@@ -241,7 +248,7 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
                     getter = beanClass.getMethod("get" + name.substring(3), new Class<?>[0]);
                 } catch (NoSuchMethodException e) {
                     try {
-                        // boolean类型的属性的getter方法可能以is开头
+                        // boolean类型的属性的getter方法可能以is开头，但是set方法没有影响
                         getter = beanClass.getMethod("is" + name.substring(3), new Class<?>[0]);
                     } catch (NoSuchMethodException e2) {
                     }
@@ -293,7 +300,7 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
                                 parseMultiRef("protocols", value, beanDefinition, parserContext);
                             } else {
                                 Object reference;
-                                // 判断方法的参数是否是基本类型，包括包装类型
+                                // 判断方法的参数是否是基本类型，包括包装类型和String
                                 if (isPrimitive(type)) {//如果参数类型为 java 的基本类型
                                     if ("async".equals(property) && "false".equals(value)
                                             || "timeout".equals(property) && "0".equals(value)
@@ -302,14 +309,14 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
                                             || "stat".equals(property) && "-1".equals(value)
                                             || "reliable".equals(property) && "false".equals(value)) {
                                         // backward compatibility for the default value in old version's xsd
-                                        /*
+                                /*
                                     兼容旧版本xsd中的default值,以上配置的值在xsd中有配置defalt值
                                     <xsd:attribute name="version" type="xsd:string" use="optional" default="0.0.0">
                                   */
                                         // 向后兼容旧版本的xsd中的默认值
                                         value = null;
                                     }
-
+                                    //如果是基本类型，直接给属性赋值
                                     reference = value;
                                     // protocol属性
                                 } else if ("protocol".equals(property)
@@ -364,6 +371,7 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
                                     reference = new RuntimeBeanReference(value);
                                 }
                                 // 为相关属性添加依赖
+                                //如果是基本类型直接给属性赋值
                                 beanDefinition.getPropertyValues().addPropertyValue(property, reference);
                             }
                         }
