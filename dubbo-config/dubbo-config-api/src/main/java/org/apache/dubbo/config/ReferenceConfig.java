@@ -220,11 +220,11 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
          *调用appendProperties方法，填充ReferenceBean的属性，属性值来源与上面一样，当然只填充ReferenceBean中属性为空的属性。
          */
         appendProperties(this);
-        //如果未使用泛接口并且consumer已经准备好的情况下，reference使用和consumer一样的泛接口
+        //如果未使用泛化接口并且consumer已经准备好的情况下，reference使用和consumer一样的泛接口
         if (getGeneric() == null && getConsumer() != null) {
             setGeneric(getConsumer().getGeneric());
         }
-        //如果是泛接口那么interface的类型是GenericService
+        //如果是泛化接口那么interface的类型是GenericService
         /**
          * 如果使用返回引用，将interface值替换为GenericService全路径名，如果不是，则加载interfacename，
          * 并检验dubbo:reference子标签dubbo:method引用的方法是否在interface指定的接口中存在。

@@ -309,6 +309,8 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
      *             dubbo管理员可以通过dubbo-admin管理系统在线上修改dubbo服务提供者的参数，最终将存储在注册中心的configurators catalog，
      *             然后通知RegistryDirectory更新服务提供者的URL中相关属性，按照最新的配置，重新创建Invoker并销毁原来的Invoker。
      *
+     *             todo:怎么会走这个方法呢？
+     *
      */
     @Override
     public synchronized void notify(List<URL> urls) {
@@ -330,17 +332,17 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
             String category = url.getParameter(Constants.CATEGORY_KEY, Constants.DEFAULT_CATEGORY);
             if (Constants.ROUTERS_CATEGORY.equals(category) || Constants.ROUTE_PROTOCOL.equals(protocol)) {
                 /**
-                 * 如果category等于routers或协议等于route，则添加到routerUrls中。
+                 * 如果category等于routers或协议等于route，则添加到routerUrls中。===>路由信息
                  */
                 routerUrls.add(url);
             } else if (Constants.CONFIGURATORS_CATEGORY.equals(category) || Constants.OVERRIDE_PROTOCOL.equals(protocol)) {
                 /**
-                 * 如果category等于configurators或协议等于override，则添加到configuratorUrls中。
+                 * 如果category等于configurators或协议等于override，则添加到configuratorUrls中。===>重新配置
                  */
                 configuratorUrls.add(url);
             } else if (Constants.PROVIDERS_CATEGORY.equals(category)) {
                 /**
-                 * 如果category等于providers，则表示服务提供者url，加入到invokerUrls中。
+                 * 如果category等于providers，则表示服务提供者url，加入到invokerUrls中。====>添加服务提供者(删除怎么办？)
                  */
                 invokerUrls.add(url);
             } else {
@@ -358,10 +360,14 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
         // routers
         /**
          * 将routerUrls路由URL转换为Router对象
+         * 如果routerUrls 不为空，说明注册中心的catalog=routers目录下新增或删除了某些路由规则，最后存在路由规则。
          */
         if (routerUrls != null && !routerUrls.isEmpty()) {
+            //将路由规则URL转换为路由实现类Router接口的实现类，例如条件路由规则、脚本路由规则具体实现类。
+            //todo:detail
             List<Router> routers = toRouters(routerUrls);
             if (routers != null) { // null - do nothing
+                //将现存的路由规则实现类覆盖RegistroyDirectory#routers属性，在下一次服务调用时，这些路由规则将生效。
                 setRouters(routers);
             }
         }
@@ -479,6 +485,7 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
      * @param urls
      * @return null : no routers ,do nothing
      * else :routers list
+     * 就是基于协议头condition://或script://构建具体的路由规则实现类
      */
     private List<Router> toRouters(List<URL> urls) {
         List<Router> routers = new ArrayList<Router>();

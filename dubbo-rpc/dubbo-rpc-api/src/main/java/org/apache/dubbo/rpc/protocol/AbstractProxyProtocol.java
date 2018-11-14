@@ -75,7 +75,7 @@ public abstract class AbstractProxyProtocol extends AbstractProtocol {
         if (exporter != null) {
             return exporter;
         }
-        //执行抽放方法暴露服务。runnable方法的行为有什么约束没有？该处不明确。
+        //执行抽向方法暴露服务。runnable方法的行为有什么约束没有？该处不明确。
         final Runnable runnable = doExport(proxyFactory.getProxy(invoker, true), invoker.getInterface(), invoker.getUrl());
         //调用proxyFactory.getProxy(invoker)来获得invoker的代理对象。
         exporter = new AbstractExporter<T>(invoker) {

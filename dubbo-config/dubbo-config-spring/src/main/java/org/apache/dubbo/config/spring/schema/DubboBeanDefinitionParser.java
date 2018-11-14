@@ -195,7 +195,7 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
             String className = element.getAttribute("class"); //获取类全名？？？？===>不是interface么？（问题1好像没有class属性）
             if (className != null && className.length() > 0) {
                 RootBeanDefinition classDefinition = new RootBeanDefinition();
-                //通过反射获取ref类的实现类Class对象===>这个对象还没有加载吧
+                //通过反射获取ref类的实现类Class对象===>这个对象还没有加载吧====>如果是多实现怎么办？===>和多实现无关，ref直接引用的是那个bean的id
                 classDefinition.setBeanClass(ReflectUtils.forName(className));
                 classDefinition.setLazyInit(false);
                   /*
@@ -221,7 +221,7 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
              */
             parseNested(element, parserContext, ServiceBean.class, true, "service", "provider", id, beanDefinition);
         } else if (ConsumerConfig.class.equals(beanClass)) {
-            /*
+            /**
              * 同上
              */
             parseNested(element, parserContext, ReferenceBean.class, false, "reference", "consumer", id, beanDefinition);
@@ -242,8 +242,6 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
                 Class<?> type = setter.getParameterTypes()[0];
                 // 将setter驼峰命名去掉set后转成-连接的命名，如setApplicationContext --> application-context
                 String property = StringUtils.camelToSplitName(name.substring(3, 4).toLowerCase() + name.substring(4), "-");
-
-
                 props.add(property);
                 Method getter = null;
                 try {
@@ -260,27 +258,27 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
                 if (getter == null || !Modifier.isPublic(getter.getModifiers()) || !type.equals(getter.getReturnType())) {
                     continue;
                 }
-                 /*
+                /**
                  * 如果属性为 parameters,如ProtocolConfig里的setParameters(Map<String, String> parameters)
                  * 那么去子节点获取 <dubbo:parameter
                  * <dubbo:protocol name="dubbo" host="127.0.0.1" port="9998" accepts="1000"  >
                      <dubbo:parameter key="adsf" value="adf" />
                      <dubbo:parameter key="errer" value="aerdf" />
-                 </dubbo:protocol>
+                   </dubbo:protocol>
                  */
                 if ("parameters".equals(property)) {
                       /* parameters属性解析 */
                     parameters = parseParameters(element.getChildNodes(), beanDefinition);
                 } else if ("methods".equals(property)) {
-                 /*
-                   解析 <dubbo:method 并设置 methods 值 --serviceConfig中
-                 */
-                   /* methods属性解析 */
+                   /**
+                    *  解析 <dubbo:method 并设置 methods 值 --serviceConfig中
+                    */
+
                     parseMethods(id, element.getChildNodes(), beanDefinition, parserContext);
                 } else if ("arguments".equals(property)) {
-                /*
-                    同上 ,解析<dubbo:argument --- MethodConfig中
-                 */
+                    /**
+                        同上 ,解析<dubbo:argument --- MethodConfig中
+                     */
                     parseArguments(id, element.getChildNodes(), beanDefinition, parserContext);
                 } else {
                     // 获取根节点中对应属性的值
@@ -338,6 +336,12 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
 
                                     reference = protocol;
                                 } else if ("onreturn".equals(property)) {
+
+                                  /**<bean id="notifyImpl" class="entities.NotifyImpl"  />
+                                     <dubbo:reference id = "onCallback" interface="com.cxf.dubbo.service.BookService" group="one" >
+                                        <dubbo:method name="getOneBook4Callback" async="false" onreturn="notifyImpl.onreturn" onthrow="notifyImpl.onthrow" />
+                                     </dubbo:reference>
+                                    */
                                     int index = value.lastIndexOf(".");
                                     //同上
                                     String returnRef = value.substring(0, index);

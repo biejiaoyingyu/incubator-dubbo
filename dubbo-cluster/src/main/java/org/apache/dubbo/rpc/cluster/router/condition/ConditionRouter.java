@@ -145,6 +145,15 @@ public class ConditionRouter implements Router, Comparable<Router> {
         return condition;
     }
 
+    /**
+     * 路由过滤实现
+     * @param invokers
+     * @param url        refer url
+     * @param invocation
+     * @param <T>
+     * @return
+     * @throws RpcException
+     */
     @Override
     public <T> List<Invoker<T>> route(List<Invoker<T>> invokers, URL url, Invocation invocation)
             throws RpcException {

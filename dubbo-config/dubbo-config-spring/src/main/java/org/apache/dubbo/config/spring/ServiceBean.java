@@ -159,13 +159,11 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
         //<dubbo:provider timeout="5000" threadpool="fixed"  threads="100" accepts="1000" token="true"/>
 
         /**
-
          *  如果provider为空，说明dubbo:service标签未设置provider属性，如果有一个dubbo:provider标签，
-         *  则取该实例，如果存在多个dubbo:provider配置则provider属性不能为空，（那么说明一个服务可以配置多个provider标签么，但是dubbo:service的provider属性需指定一个）
-
+         *  则取该实例，如果存在多个dubbo:provider配置则provider属性不能为空，
+         *  （那么说明一个服务可以配置多个provider标签么，但是dubbo:service的provider属性需指定一个）
          *  如果provider为空，说明dubbo:service标签未设置provider属性，如果只有一个dubbo:provider标签，
          *  则取该实例，如果存在多个dubbo:provider配置则provider属性不能为空，（开发者手册说明多个取第一个的么？）
-
          *  否则抛出异常：”Duplicate provider configs”。
          *
          *  https://blog.csdn.net/heroqiang/article/details/79171681

@@ -134,7 +134,7 @@ public class RegistryProtocol implements Protocol {
         /**
          * 启动服务提供者服务，监听指定端口，准备服务消费者的请求，这里其实就是从WrapperInvoker中的url
          * (注册中心url)中提取export属性，描述服务提供者的url，然后启动服务提供者。
-         * 详细进入
+         * todo:详细进入===>暴露具体服务
          */
         final ExporterChangeableWrapper<T> exporter = doLocalExport(originInvoker);
 
@@ -181,6 +181,7 @@ public class RegistryProtocol implements Protocol {
         final URL overrideSubscribeUrl = getSubscribedOverrideUrl(registeredProviderUrl);
         final OverrideListener overrideSubscribeListener = new OverrideListener(overrideSubscribeUrl, originInvoker);
         overrideListeners.put(overrideSubscribeUrl, overrideSubscribeListener);
+        //todo：详细====>向注册中心注册
         registry.subscribe(overrideSubscribeUrl, overrideSubscribeListener);
         //Ensure that a new exporter instance is returned every time export
         return new DestroyableExporter<T>(exporter, originInvoker, overrideSubscribeUrl, registeredProviderUrl);
@@ -207,7 +208,7 @@ public class RegistryProtocol implements Protocol {
                      */
                     final Invoker<?> invokerDelegete = new InvokerDelegete<T>(originInvoker, getProviderUrl(originInvoker));
                     /**
-                     * 根据Dubbo内置的SPI机制，将调用DubboProtocol#export方法。
+                     * 根据Dubbo内置的SPI机制，将调用DubboProtocol#export方法。todo:dubbo
                      */
                     exporter = new ExporterChangeableWrapper<T>((Exporter<T>) protocol.export(invokerDelegete), originInvoker);
                     bounds.put(key, exporter);
@@ -413,8 +414,7 @@ public class RegistryProtocol implements Protocol {
          * side=consumer&
          * timestamp=1528380277185
          */
-        directory.subscribe(subscribeUrl.addParameter(Constants.CATEGORY_KEY,
-                Constants.PROVIDERS_CATEGORY + "," + Constants.CONFIGURATORS_CATEGORY + "," + Constants.ROUTERS_CATEGORY));
+        directory.subscribe(subscribeUrl.addParameter(Constants.CATEGORY_KEY, Constants.PROVIDERS_CATEGORY + "," + Constants.CONFIGURATORS_CATEGORY + "," + Constants.ROUTERS_CATEGORY));
         // 多分组为MergeableCluster，单分组默认为FailoverCluster
         // 分别返回的Invoker就是MergeableClusterInvoker和FailoverClusterInvoker
         Invoker invoker = cluster.join(directory);

@@ -103,22 +103,23 @@ public abstract class AbstractConfig implements Serializable {
         // 拼接前缀，eg：ProviderConfig --> dubbo.provider.
         String prefix = "dubbo." + getTagName(config.getClass()) + ".";
         Method[] methods = config.getClass().getMethods();
+        //遍历当前类
         for (Method method : methods) {
             try {
                 String name = method.getName();
                 // 判断setter方法访问修饰符为public并且参数只有一个且是基本类型（包括包装类型、String和Object）
-
-                if (name.length() > 3 &&
-                        name.startsWith("set") &&
-                        Modifier.isPublic(method.getModifiers())
-                        && method.getParameterTypes().length == 1 &&
-                        isPrimitive(method.getParameterTypes()[0])) {
-
+                if (name.length() > 3
+                        && name.startsWith("set")
+                        && Modifier.isPublic(method.getModifiers())
+                        && method.getParameterTypes().length == 1
+                        && isPrimitive(method.getParameterTypes()[0])) {
+                    //通过seter()方法获取属性
                     String property = StringUtils.camelToSplitName(name.substring(3, 4).toLowerCase() + name.substring(4), ".");
 
                     String value = null;
                     // 如果id属性不为空，携带id拼接key尝试从系统属性中获取相关配置
                     if (config.getId() != null && config.getId().length() > 0) {
+                        //dubbo.provider.id.属性
                         String pn = prefix + config.getId() + "." + property;
                         value = System.getProperty(pn);
                         if (!StringUtils.isBlank(value)) {
@@ -127,6 +128,7 @@ public abstract class AbstractConfig implements Serializable {
                     }
                     // 如果属性为空(携带id从系统环境变量中获取不到)，不带id拼接key尝试从系统属性中获取相关配置
                     if (value == null || value.length() == 0) {
+                        //dubbo.provider.属性
                         String pn = prefix + property;
                         value = System.getProperty(pn);
                         if (!StringUtils.isBlank(value)) {

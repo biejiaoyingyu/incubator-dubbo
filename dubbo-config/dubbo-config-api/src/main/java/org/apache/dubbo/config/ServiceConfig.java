@@ -311,7 +311,10 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
          * 泛化调用就是服务消费者端因为某种原因并没有该服务接口，这个原因有很多，比如是跨语言的，一个PHP工程师想调用某个java接口，
          * 他并不能按照你约定，去写一个个的接口，Dubbo并不是跨语言的RPC框架，但并不是不能解决这个问题，这个PHP程序员搭建了一个简单的java web项目，
          * 引入了dubbo的jar包，使用dubbo的泛化调用，然后利用web返回json，这样也能完成跨语言的调用。泛化调用的好处之一就是这个了。
-         * 为啥要在服务端验证？？？？
+         * 为啥要在服务端验证？？？？===>泛化实现在消费端啊===>文档上确实有这种用法
+         *
+         * <bean id="genericService" class="com.foo.MyGenericService" />
+         * <dubbo:service interface="com.foo.BarService" ref="genericService" />
          */
         if (ref instanceof GenericService) {
             interfaceClass = GenericService.class;
@@ -362,10 +365,12 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
          *   正常调用dubbo远程服务要生成的代理实例，然后消费者这方会把 Proxy 通过构造函数传给 消费者方的Stub ，然后把 Stub 暴
          *   露给用户，Stub 可以决定要不要去调 Proxy。会通过代理类去完成这个调用，这样在Stub类中，就可以做一些额外的事，来对服
          *   务的调用过程进行优化或者容错的处理。
+         *
+         *   按道理说本地存根应该在客户端，但是操作守则上说的是在服务端，而且我们实验的时候在客户端是可以的
          */
         if (stub != null) {
             if ("true".equals(stub)) {
-                //这里需要断点看一下interfaceName是什么===》应该是interface属性
+                //这里需要断点看一下interfaceName是什么===>应该是interface属性
                 stub = interfaceName + "Stub";
             }
             Class<?> stubClass;
@@ -758,7 +763,6 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         }
 
         /**
-         *
          * 接口暴露实现逻辑
          * 获取dubbo:service标签的scope属性，其可选值为none(不暴露)、local(本地)、remote(远程)，如果配置为none，则不暴露。默认为local。
          */
@@ -879,10 +883,11 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                          * dubbo-rpc-api/src/main/resources/METAINF/dubbo/internal/com.alibaba.dubbo.rpc.Protocol：
                          */
 
-                        //export属性：值为服务提供者的URL，为什么需要关注这个URL呢？
+                        // export属性：值为服务提供者的URL，为什么需要关注这个URL呢？
                         // protocol属性为Protocol$Adaptive，Dubbo在加载组件实现类时采用SPI
                         // (插件机制，有关于插件机制，在该专题后续文章将重点分析)，在这里我们只需要知道，
                         // 根据URL冒号之前的协议名将会调用相应的方法。
+                        // 这里是registry:// ======>这个很重要，所以自适应为RegistryProtocol(深刻理解自适应)
                         Exporter<?> exporter = protocol.export(wrapperInvoker);
                         //将创建的exporter放进链表便于管理
                         exporters.add(exporter);
