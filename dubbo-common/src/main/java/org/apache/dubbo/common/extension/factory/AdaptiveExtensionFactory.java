@@ -59,16 +59,34 @@ public class AdaptiveExtensionFactory implements ExtensionFactory {
     private final List<ExtensionFactory> factories;
 
     public AdaptiveExtensionFactory() {
+        /**
+         * 找到ExtensionFactory的ExtensionLoader
+         */
         ExtensionLoader<ExtensionFactory> loader = ExtensionLoader.getExtensionLoader(ExtensionFactory.class);
+
         List<ExtensionFactory> list = new ArrayList<ExtensionFactory>();
+        /**
+         * 根据name获取具体的扩展，放到list中
+         */
         for (String name : loader.getSupportedExtensions()) {
             list.add(loader.getExtension(name));
         }
+        /**
+         * 赋值给factories
+         */
         factories = Collections.unmodifiableList(list);
     }
 
+    /**
+     * 和spi对象给ioc容器管理有关系？
+     * @param type object type.
+     * @param name object name.
+     * @param <T>
+     * @return
+     */
     @Override
     public <T> T getExtension(Class<T> type, String name) {
+        //factories是一个变量，他的填充处就是AdaptiveExtensionFactory的构造方法
         for (ExtensionFactory factory : factories) {
             /**
              * 从这里我们看出，ObjectFactory. getExtension(Class<T> type, String name)是先从

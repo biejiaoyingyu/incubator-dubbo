@@ -128,6 +128,16 @@ public class RegistryProtocol implements Protocol {
     }
 
 
+    /**
+     * 但是是不是只调了registryProtocol?当时不是，还记得在@adaptive那个注解的时候说扫描，有提到warpper类，
+     * 就是将协议进行包裹，所以这个protocal是融合了ProtocolFilterWrapper和ProtocolListenerWrapper和
+     * DubboProtocol三者，先执行ProtocolFilterWrapper和ProtocolListenerWrapper，他们针对registry协
+     * 议没做啥，直接进行下一步，进入了RegistryProtocol的export
+     * @param <T>
+     * @return
+     * @throws RpcException
+     */
+
     @Override
     public <T> Exporter<T> export(final Invoker<T> originInvoker) throws RpcException {
         //export invoker
@@ -195,6 +205,8 @@ public class RegistryProtocol implements Protocol {
      * 里我们只要知道,会再此次监听该端口，然后将dubbo:service的服务handler加入到命令处理器
      * 中，当有消息消费者连接该端口时，通过网络解包，将需要调用的服务和参数等信息解析处理后，转交
      * 给对应的服务实现类处理即可。
+     *
+     * 会真正调用的是DubboProtocol，当然我们不能忘了ProtocolFilterWrapper和ProtocolListenerWrapper。
      */
     private <T> ExporterChangeableWrapper<T> doLocalExport(final Invoker<T> originInvoker) {
         String key = getCacheKey(originInvoker);

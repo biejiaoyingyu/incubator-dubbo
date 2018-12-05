@@ -45,6 +45,9 @@ import java.util.Collections;
  * dubbo-rpc-api/src/main/resources/META-INF/dubbo/internal/com.alibaba.dubbo.rpc.InvokerListener
  * deprecated=com.alibaba.dubbo.rpc.listener.DeprecatedInvokerListener
  * public class DeprecatedInvokerListener extends InvokerListenerAdapter
+ *
+ *
+ * 看完了ProtocolFilterWrapper，我们再看下他的下一个ProtocolListenerWrapper。
  */
 public class ProtocolListenerWrapper implements Protocol {
 
@@ -62,6 +65,13 @@ public class ProtocolListenerWrapper implements Protocol {
         return protocol.getDefaultPort();
     }
 
+    /**
+     * Exporter包装成ListenerExporterWrapper的实例，他是原来的exporter和从spi扩展点中获取的ExporterListener的实例组成
+     * @param invoker Service invoker 服务的执行体
+     * @param <T>
+     * @return
+     * @throws RpcException
+     */
     @Override
     public <T> Exporter<T> export(Invoker<T> invoker) throws RpcException {
         //特殊协议，跳过监听器触发

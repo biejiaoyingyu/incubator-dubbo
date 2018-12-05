@@ -59,6 +59,10 @@ public class ProtocolFilterWrapper implements Protocol {
      * 这里我们可以看到 export 和 refer 过程都会被 filter 过滤，那么如果记录接口调用时
      * 间时，服务器端部分只是记录接口在服务器端的执行时间，而客户端部分会记录接口在服务器端
      * 的执行时间+网络传输时间。
+     *
+     *
+     * 这个filter处理的时候建立了一条调用链InvokerChain
+     * https://www.jianshu.com/p/f390bb88574d ===>要考的
      * @param invoker
      * @param key
      * @param group
@@ -70,6 +74,11 @@ public class ProtocolFilterWrapper implements Protocol {
         //通过该句获得扩展配置的过滤器列表，具体机制需要研究该类的实现
         /**
          * 加载系统配置的所有Filer，并根据作用对象（服务提供者、服务消费者），返回合适的Filter链表。
+         *
+         * 从SPI中获取激活的Filter类的实例，在@activite的那一节也讲过，他的主要用法是在Filter上，
+         * 其实就是说的这里，然后将他们变成链式结构，保证他们再调用的时候，一个接着一个，当然这是常用
+         * 的filter的使用模式。
+         *
          */
         List<Filter> filters = ExtensionLoader.getExtensionLoader(Filter.class).getActivateExtension(invoker.getUrl(), key, group);
         if (!filters.isEmpty()) {
@@ -79,6 +88,7 @@ public class ProtocolFilterWrapper implements Protocol {
                 final Invoker<T> next = last;
                 /**
                  * 根据Filter构建Invoker链。
+                 *  // 典型的装饰器模式，将invoker用filter逐层进行包装
                  */
                 last = new Invoker<T>() {
 
@@ -97,6 +107,7 @@ public class ProtocolFilterWrapper implements Protocol {
                         return invoker.isAvailable();
                     }
 
+                    //重点，每个filter在执行invoke方法时，会触发其下级节点的invoke方法，最后一级节点即为最原始的服务
                     @Override
                     public Result invoke(Invocation invocation) throws RpcException {
                         return filter.invoke(next, invocation);
@@ -123,7 +134,13 @@ public class ProtocolFilterWrapper implements Protocol {
     }
 
 
-
+    /**
+     * 暴露协议的时候先暴露这个？？？？？？重要，要考试的
+     * @param invoker Service invoker 服务的执行体
+     * @param <T>
+     * @return
+     * @throws RpcException
+     */
     @Override
     public <T> Exporter<T> export(Invoker<T> invoker) throws RpcException {
         /**
@@ -135,10 +152,19 @@ public class ProtocolFilterWrapper implements Protocol {
         }
         /**
          * 如果为具体协议，例如dubbo等，则通过buildInvokerChain构建Invoker链。
+         * 这个filter处理的时候建立了一条调用链InvokerChain
          */
         return protocol.export(buildInvokerChain(invoker, Constants.SERVICE_FILTER_KEY, Constants.PROVIDER));
     }
 
+    /**
+     * // 客户端引用服务
+     * @param type Service class 服务的类型
+     * @param url  URL address for the remote service 远程服务的URL地址
+     * @param <T>
+     * @return
+     * @throws RpcException
+     */
     @Override
     public <T> Invoker<T> refer(Class<T> type, URL url) throws RpcException {
         if (Constants.REGISTRY_PROTOCOL.equals(url.getProtocol())) {

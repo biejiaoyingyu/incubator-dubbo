@@ -90,11 +90,8 @@ public class ExtensionLoader<T> {
      * 有 Adaptive 注解，如果是，则直接赋值
      * ========================================https://www.cnblogs.com/heart-king/p/5632524.html(spi很重要)
      * 1）如果有打在接口方法上，调ExtensionLoader.getAdaptiveExtension()获取设配类，会先通过前面的过程生成java的源代码，
-
      * 在通过编译器编译成class加载。但是Compiler的实现策略选择也是通过ExtensionLoader.getAdaptiveExtension()，
-
      * 如果也通过编译器编译成class文件那岂不是要死循环下去了吗？
-
      * ExtensionLoader.getAdaptiveExtension()，对于有实现类上去打了注解@Adaptive的dubbo spi扩展机制，它获取设配类
      * 不在通过前面过程生成设配类java源代码，而是在读取扩展文件的时候遇到实现类打了注解@Adaptive就把这个类作为设配类缓存
      * 在ExtensionLoader中，调用是直接返回
@@ -105,13 +102,16 @@ public class ExtensionLoader<T> {
      *
      * @param type
      */
+
+    /**
+     * https://www.jianshu.com/p/dc616814ce98===>也很重要
+     * 第一个构造方法是私有的，说明不想通过外部实例化，将实例化的过程统一收紧。第二个是objectFactory这个在后面的ioc部分会发挥它的作用
+     */
     private ExtensionLoader(Class<?> type) {
         this.type = type;
-        objectFactory = (
-                type == ExtensionFactory.class ?
-                        null :
-                        ExtensionLoader.getExtensionLoader(ExtensionFactory.class).getAdaptiveExtension()
-        );
+        //这里的意思是如果type不是ExtensionFactory.class，需要先加载ExtensionFactory.class====>循环去缓存中寻找==>.getAdaptiveExtension());
+        //如果type是ExtensionFactory.class，那么objectFactory = null,因为自己就是Factory
+        objectFactory = (type == ExtensionFactory.class ? null : ExtensionLoader.getExtensionLoader(ExtensionFactory.class).getAdaptiveExtension());
     }
 
     private static <T> boolean withExtensionAnnotation(Class<T> type) {
@@ -170,6 +170,18 @@ public class ExtensionLoader<T> {
      * @param key url parameter key which used to get extension point names
      * @return extension list which are activated.
      * @see #getActivateExtension(org.apache.dubbo.common.URL, String, String)
+     *
+     *
+     *
+     * ActiveExtension和AdaptiveExtension不一样的
+     *
+     * 1. 根据loader.getActivateExtension中的group和搜索到此类型的实例进行比较，
+     * 如果group能匹配到，就是我们选择的，也就是在此条件下需要激活的。
+     * 2. @Activate中的value是参数是第二层过滤参数（第一层是通过group），在group
+     * 校验通过的前提下，如果URL中的参数（k）与值（v）中的参数名同@Activate中的value
+     * 值一致或者包含，那么才会被选中。相当于加入了value后，条件更为苛刻点，需要URL
+     * 中有此参数并且，参数必须有值。
+     * 3.@Activate的order参数对于同一个类型的多个扩展来说，order值越小，优先级越高。
      */
     public List<T> getActivateExtension(URL url, String key) {
         return getActivateExtension(url, key, null);
@@ -215,12 +227,26 @@ public class ExtensionLoader<T> {
      * @param group  group
      * @return extension list which are activated
      * @see org.apache.dubbo.common.extension.Activate
+     *
+     *
+     * filter被分为两类，一类是标注了Activate注解的filter，包括dubbo原生的和用户自定义的；
+     * 一类是用户在spring配置文件中手动注入的filter对标注了Activate注解的filter，可以通过
+     * before、after和order属性来控制它们之间的相对顺序，还可以通过group来区分服务端和消费
+     * 端手动注入filter时，可以用default来代表所有标注了Activate注解的filter，以此来控制
+     * 两类filter之间的顺序手动注入filter时，可以在filter名称前加一个"-"表示排除某一个filter，
+     * 比如说如果配置了一个-default的filter，将不再加载所有标注了Activate注解的filter
      */
     public List<T> getActivateExtension(URL url, String[] values, String group) {
         List<T> exts = new ArrayList<T>();
+        /**
+         * 将传递过来的values包装成List类型的names
+         */
         List<String> names = values == null ? new ArrayList<String>(0) : Arrays.asList(values);
         /**
          * 如果配置的service.filter或referecnce.filter包含了-default，表示禁用系统默认提供的一系列过滤器。
+         */
+        /**
+         * 包装好的数据中不包含"-default"
          */
         if (!names.contains(Constants.REMOVE_VALUE_PREFIX + Constants.DEFAULT_KEY)) {
             /**
@@ -228,7 +254,13 @@ public class ExtensionLoader<T> {
              */
             getExtensionClasses();
             for (Map.Entry<String, Object> entry : cachedActivates.entrySet()) {
+                /**
+                 * 获取扩展的名称
+                 */
                 String name = entry.getKey();
+                /**
+                 * 获取扩展的注解
+                 */
                 Object activate = entry.getValue();
 
                 String[] activateGroup, activateValue;
@@ -245,7 +277,18 @@ public class ExtensionLoader<T> {
                 /**
                  * 根据group刷选出适配的过滤器。
                  */
+                /**
+                 * 判断group是否属于范围
+                 *
+                 * 1. 如果activate注解的group没有设定，直接返回true
+                 * 2. 如果设定了，需要和传入的额group进行比较，看是否
+                 * 包含其中，如果包含，返回true
+                 *  进入：：：
+                 */
                 if (isMatchGroup(group, activateGroup)) {
+                    /**
+                     * group 校验通过了，从缓存中获取此name对应的实例
+                     */
                     T ext = getExtension(name);
                     /**
                      * 也可以对单个filter进行禁用，其方法是-过滤器名称的方式。例如如想禁用AccessLogFilter，则可以通过-accesslog方式禁用。
@@ -254,14 +297,42 @@ public class ExtensionLoader<T> {
                      * 判断过滤器是否激活，其逻辑是如果Filter上的@Activate注解value值不为空，则需要判断url中是否包含键为value的属性对，
                      * 存在则启用，不存在则不启用。
                      */
-                    if (!names.contains(name) && !names.contains(Constants.REMOVE_VALUE_PREFIX + name) && isActive(activateValue, url)) {
+
+                    if (
+                            /**
+                             * names 不包含 遍历此时的name
+                             */
+                            !names.contains(name) &&
+                            /**
+                             * names中不包含"-default"
+                             */
+                            !names.contains(Constants.REMOVE_VALUE_PREFIX + name) &&
+                            /**
+                             * 通过URL判断这个activate注解是激活的
+                             * 进入:
+                             */
+                            isActive(activateValue, url)) {
+                        /**
+                         * 增加扩展
+                         */
                         exts.add(ext);
                     }
                 }
             }
+            /**
+             * 按照Activate的方式进行排序，注意order
+             */
             Collections.sort(exts, ActivateComparator.COMPARATOR);
         }
         List<T> usrs = new ArrayList<T>();
+
+        /**
+         * 借用usrs这个临时变量，进行循环往exts中塞具体的ext的对象。
+         * 如果碰到了"default"就添加到头部，清空usrs这个临时变量。
+         * 如果没有"default"那么usrs不会清空，所以下面有个if，说usrs不为空
+         * 将里面的内容增加到exts中
+         */
+
         /**
          * 加载用户自定义的Filter，也即是service.filter或reference.filter指定的过滤器。
          *
@@ -269,25 +340,39 @@ public class ExtensionLoader<T> {
          */
         for (int i = 0; i < names.size(); i++) {
             String name = names.get(i);
-            if (!name.startsWith(Constants.REMOVE_VALUE_PREFIX)
-                    && !names.contains(Constants.REMOVE_VALUE_PREFIX + name)) {
+            // 针对用户配置的每一个filter，需要满足以下两个条件才会被加载：
+            // 1.名称不是以"-"开头
+            // 2.用户配置的所有filter列表中不包含-name的filter
+            if (!name.startsWith(Constants.REMOVE_VALUE_PREFIX) && !names.contains(Constants.REMOVE_VALUE_PREFIX + name)) {
                 if (Constants.DEFAULT_KEY.equals(name)) {
-                    if (!usrs.isEmpty()) {
-                        exts.addAll(0, usrs);
-                        usrs.clear();
+                    // 用户自己配置filter列表时，可以使用default的key来代表dubbo原生的filter列表，这样一来就可以控制dubbo
+                    // 原生filter列表和用户自定义filter列表之间的相对顺序
+                    if (Constants.DEFAULT_KEY.equals(name)) {
+                        if (!usrs.isEmpty()) {
+                            exts.addAll(0, usrs);
+                            usrs.clear();
+                        }
+                    } else {
+                        T ext = getExtension(name);
+                        usrs.add(ext);
                     }
-                } else {
-                    T ext = getExtension(name);
-                    usrs.add(ext);
                 }
             }
-        }
-        if (!usrs.isEmpty()) {
-            exts.addAll(usrs);
+            if (!usrs.isEmpty()) {
+                exts.addAll(usrs);
+            }
         }
         return exts;
     }
 
+
+    /**
+     * 判断group是否属于范围
+     * <p>
+     * 1. 如果activate注解的group没有设定，直接返回true
+     * 2. 如果设定了，需要和传入的额group进行比较，看是否
+     * 包含其中，如果包含，返回true
+     */
     private boolean isMatchGroup(String group, String[] groups) {
         if (group == null || group.length() == 0) {
             return true;
@@ -302,11 +387,32 @@ public class ExtensionLoader<T> {
         return false;
     }
 
+    /**
+     * ActivateComparator比较器的规则如下，总结起来有这么几条规则：
+     1.before指定的过滤器，该过滤器将在这些指定的过滤器之前执行
+     2.after指定的过滤器，该过滤器将在这些指定的过滤器之后执行
+     3.order数值越小，越先执行
+     4.order数值相等的条件下，顺序将依赖于两个filter的加载顺序
+     5.before/after的优先级高于order
+
+     * @param keys
+     * @param url
+     * @return
+     */
     private boolean isActive(String[] keys, URL url) {
+        /**
+         * 如果@Activate注解中的value是空的直接返回true
+         */
         if (keys.length == 0) {
             return true;
         }
+        /**
+         * 从activate.value()拿到的数据进行遍历
+         */
         for (String key : keys) {
+            /**
+             * 从URL中获取参数，进行遍历，如果有一个参数同key一致，或者是以.key的方式结尾。
+             */
             for (Map.Entry<String, String> entry : url.getParameters().entrySet()) {
                 String k = entry.getKey();
                 String v = entry.getValue();
@@ -637,15 +743,37 @@ public class ExtensionLoader<T> {
     private T injectExtension(T instance) {
         try {
             if (objectFactory != null) {
+                /**
+                 * 寻找实例中的所有的方法
+                 */
                 for (Method method : instance.getClass().getMethods()) {
+                    /**
+                     * 将属性的set方法找出来
+                     */
                     if (method.getName().startsWith("set")
                             && method.getParameterTypes().length == 1
                             && Modifier.isPublic(method.getModifiers())) {
+                        /**
+                         * set方法一个参数，所以找到第一个参数
+                         *
+                         * 例如： public void setPeople(People p){
+                         *     this.p=p
+                         * }
+                         */
                         Class<?> pt = method.getParameterTypes()[0];
                         try {
+                            /**
+                             * 获取属性名称 ：people
+                             */
                             String property = method.getName().length() > 3 ? method.getName().substring(3, 4).toLowerCase() + method.getName().substring(4) : "";
+                            /**
+                             * 从对象工厂中获取，此类型，此名称的扩展的对象
+                             */
                             Object object = objectFactory.getExtension(pt, property);
                             if (object != null) {
+                                /**
+                                 * 利用反射添加进实例中，完成ioc
+                                 */
                                 method.invoke(instance, object);
                             }
                         } catch (Exception e) {
@@ -707,7 +835,9 @@ public class ExtensionLoader<T> {
             String value = defaultAnnotation.value();
             if ((value = value.trim()).length() > 0) {
                 String[] names = NAME_SEPARATOR.split(value);
-                // 默认扩展点只能有一个
+                /**
+                 * 如果注解中有value，说明有默认的实现，那么将value放到cachedDefaultName中,注：这里的意思是URL中没有相应的属性会用默认实现。
+                 */
                 if (names.length > 1) {
                     throw new IllegalStateException("more than 1 default extension name on extension " + type.getName()
                             + ": " + Arrays.toString(names));
@@ -817,6 +947,20 @@ public class ExtensionLoader<T> {
      * @param clazz
      * @param name
      * @throws NoSuchMethodException
+     *
+     * 如果有的类上带有@Adaptive注解，那么将这个类赋值给cachedAdaptiveClass，注意这个点，查询type类型
+     * 适配器类的时候会优先寻找cachedAdaptiveClass，因为是系统指定的适配器类，优先级最高，如果有多个实现
+     * 再类上都打上了@Adaptive注解，会报错：标准的适配器类只能有一个。如果这个扩展类没有打上@Adaptive注
+     * 解就更有意思了。首先第一步会验证下有没有type这个类型作为入参的构造方法，为什么要这么做？因为Wrapper，
+     * 有的类型需要包装一下，例如type=Protocol.class 就会看到有DubboProtocol真实的Protocal类,还会有
+     * ProtocolFilterWrapper和ProtocolListenerWrapper这种Wrapper类，这种Wrapper类的共同点就是构
+     * 造函数的入参是type类型，所以在解析的时候有这么一步。如果有这种构造函数的就是Warpper类，将这些Warpper
+     * 类型的数据放到cachedWrapperClasses这个集合中缓存。如果没有这种类型的构造函数，就是正常的type类型
+     * 的实例了，如果在文件中没有声明这个扩展的名称（=左边的部分），就会根据这个类名创建一个名称。然后进入下
+     * 一个环节@Activate数据的解析，这个本来是下一节的内容，我们提前了解下吧。查看type类上有没有@Activate
+     * 注解，如果有的话，将名称与注解放到cachedActivates这个Map中进行缓存。将扩展类和名称放入cachedNames
+     * 这个Map中进行缓存，将名称和扩展类的class放入传递进来的extensionClasses中，最后这个extensionClasses
+     * 会被返回出来被使用。OK，到目前为止我们结束了getExtensionClasses方法的讲解，是不是很绕，东西很多。
      */
     private void loadClass(Map<String, Class<?>> extensionClasses, java.net.URL resourceURL, Class<?> clazz, String name) throws NoSuchMethodException {
         // 如果配置的class不是给定接口的实现类，抛出异常,外面会捕获异常，然后加载下一行
@@ -832,7 +976,9 @@ public class ExtensionLoader<T> {
          * 这里同时可以确认，对于一个 spi 接口，有且只有一个类带有 adaptive 注解，否则会出错；
          */
         // 注解@Adaptive的class为自适应扩展点
-
+        /**
+         * 判断这个加载的类上，有没有Adaptive的注解，如果有，将此类作为cachedAdaptiveClass
+         */
         /**
          *
          * 这一句很重要===>防止无线循环
@@ -863,7 +1009,7 @@ public class ExtensionLoader<T> {
         } else if (isWrapperClass(clazz)) {
             /**
              * 如果类实现没有打上@Adaptive， 判断实现类是否存在入参为接口的构造器（就是DubbboProtocol类是否还有入参为Protocol的构造器），
-             * 有的话作为包装类缓存到此ExtensionLoader的Set<Class<?>>集合中，这个其实是个装饰模式
+             * 有的话作为包装类缓存到此ExtensionLoader的Set<Class<?>>集合中，这个其实是个装饰模式====>在spi中会怎么么扩展？
              */
             Set<Class<?>> wrappers = cachedWrapperClasses;
             if (wrappers == null) {
@@ -873,7 +1019,7 @@ public class ExtensionLoader<T> {
             // 添加为wrapper包装类
             wrappers.add(clazz);
         } else {
-            // 没有以给定接口为参数的构造方法则尝试获取默认无参构造方法
+            //到了这里，说明是个正常的类： 没有以给定接口为参数的构造方法则尝试获取默认无参构造方法
             /**
              * 如果既不是设配对象也不是wrapped的对象，那就是扩展点的具体实现对象　　
              * 查找实现类上有没有打上@Activate注解，有缓存到变量cachedActivates
@@ -882,8 +1028,8 @@ public class ExtensionLoader<T> {
             clazz.getConstructor();
             if (name == null || name.length() == 0) {
                 /* 如果配置的key为空，则尝试获取class注解中配置的name 也即在配置中没有指定相应的key值，可以在类上面用@Extension("NAME1")指定*/
+                //注意生成name的方法：进入
                 name = findAnnotationName(clazz);
-
                 if (name.length() == 0) {
                     throw new IllegalStateException("No such extension name for the class " + clazz.getName() + " in the config " + resourceURL);
                 }
@@ -899,6 +1045,8 @@ public class ExtensionLoader<T> {
                     cachedActivates.put(names[0], activate);
                 } else {
                     // support com.alibaba.dubbo.common.extension.Activate
+                    // 1）接口方法中必须至少有一个方法打上了@Adaptive注解
+                    // 2）打上了@Adaptive注解的方法参数必须有URL类型参数或者有参数中存在getURL()方法
                     // 兼容旧版本
                     com.alibaba.dubbo.common.extension.Activate oldActivate = clazz.getAnnotation(com.alibaba.dubbo.common.extension.Activate.class);
                     if (oldActivate != null) {
@@ -1001,7 +1149,6 @@ public class ExtensionLoader<T> {
      * 2）打上了@Adaptive注解的方法参数必须有URL类型参数或者有参数中存在getURL()方法
      * @return
      */
-
     private Class<?> createAdaptiveExtensionClass() {
         // 拼接自适应扩展点class的字符串
         String code = createAdaptiveExtensionClassCode();
@@ -1108,12 +1255,43 @@ public class ExtensionLoader<T> {
 
              }
      */
-    //================================================
+
+//    创建适配器的扩展类的String
+//     * <p>
+//     * <p>
+//     * 创建这个适配器的扩展类，有几个前提：
+//     * 1. 必须有SPI的注解
+//     * 2. 被SPI声明的接口中至少一个方法有Adaptive注解。
+//     * ProxyFactory
+//     * 下面是他的说明：
+//     * 当声明再方法上的Adaptive中的value的作用就是，从URL中获取key,value,例如ProxyFactory
+//     *
+//     * @return
+//     * @Adaptive({Constants.PROXY_KEY})==========="proxy" <T> Invoker<T> getInvoker(T proxy, Class<T> type, URL url) throws RpcException;
+//     * <p>
+//     * 如果URL中是dubbo:xxxx?proxy=jdk,而SPI中的值是javassist,那么就是
+//     * <p>
+//     * String extName = url.getParameter("proxy", "javassist");  //结果是jdk
+//     * /
+
+// 首先寻找这个类中所有的方法，查看方法中有没有打@Adaptive注解的，一个没有，直接报错！
+// 对于那些没有加@Adaptive注解的方法，直接在要创建的Adaptive类上增加此方法不支持操作的异常。
+// 在方法中的@Adaptive是可以加上value值的，如果用户填了，使用此值，没有填将使用程序根据类名
+// 创建的值作为value值，这个value值通URL中的参数名保持一致。defaultExtName是SPI中的value
+// 值，这里可以看一下我们的测试四的方法。
+
+
 
     private String createAdaptiveExtensionClassCode() {
         StringBuilder codeBuilder = new StringBuilder();
+        /**
+         * 获取这个类型的所有的方法
+         */
         Method[] methods = type.getMethods();
         boolean hasAdaptiveAnnotation = false;
+        /**
+         * 遍历所有方法，至少有一个方法打了Adaptive的注解，否则报错
+         */
         for (Method m : methods) {
             if (m.isAnnotationPresent(Adaptive.class)) {
                 hasAdaptiveAnnotation = true;
@@ -1133,17 +1311,31 @@ public class ExtensionLoader<T> {
 
         for (Method method : methods) {
             Class<?> rt = method.getReturnType();
+            /**
+             * 参数列表的类型
+             */
             Class<?>[] pts = method.getParameterTypes();
+            /**
+             * 异常列表的类型
+             */
             Class<?>[] ets = method.getExceptionTypes();
-
+            /**
+             * 获得Adaptive的注解
+             */
             Adaptive adaptiveAnnotation = method.getAnnotation(Adaptive.class);
             StringBuilder code = new StringBuilder(512);
+            /**
+             * 如果这个方法没有注解，添加不支持调用此方法的异常
+             */
             if (adaptiveAnnotation == null) {
                 code.append("throw new UnsupportedOperationException(\"method ")
                         .append(method.toString()).append(" of interface ")
                         .append(type.getName()).append(" is not adaptive method!\");");
             } else {
                 int urlTypeIndex = -1;
+                /**
+                 * 寻找列表中的类型是URL.class，记录他的位置，数据放到urlTypeIndex中
+                 */
                 for (int i = 0; i < pts.length; ++i) {
                     if (pts[i].equals(URL.class)) {
                         urlTypeIndex = i;
@@ -1151,6 +1343,10 @@ public class ExtensionLoader<T> {
                     }
                 }
                 // found parameter in URL type
+                /**
+                 * 找到了URL类型的参数
+                 *
+                 * */
                 if (urlTypeIndex != -1) {
                     // Null Point check
                     String s = String.format("\nif (arg%d == null) throw new IllegalArgumentException(\"url == null\");",
@@ -1197,9 +1393,14 @@ public class ExtensionLoader<T> {
                     s = String.format("%s url = arg%d.%s();", URL.class.getName(), urlTypeIndex, attribMethod);
                     code.append(s);
                 }
-
+                /**
+                 * 获取adaptive注解的value
+                 */
                 String[] value = adaptiveAnnotation.value();
                 // value is not set, use the value generated from class name as the key
+                /**
+                 * 如果value没有设置，那么将使用类的名称作为key
+                 */
                 if (value.length == 0) {
                     char[] charArray = type.getSimpleName().toCharArray();
                     StringBuilder sb = new StringBuilder(128);
@@ -1216,6 +1417,9 @@ public class ExtensionLoader<T> {
                     value = new String[]{sb.toString()};
                 }
 
+                /**
+                 * 如果参数列表中有Invocation的实例
+                 */
                 boolean hasInvocation = false;
                 for (int i = 0; i < pts.length; ++i) {
                     if (pts[i].getName().equals("org.apache.dubbo.rpc.Invocation")) {
@@ -1228,12 +1432,20 @@ public class ExtensionLoader<T> {
                         break;
                     }
                 }
-
+                /**
+                 * defaultExtName为spi注解中的value
+                 */
                 String defaultExtName = cachedDefaultName;
                 String getNameCode = null;
                 for (int i = value.length - 1; i >= 0; --i) {
+                    /**
+                     * 如果defaultExtName 存在，spi注解中的value存在
+                     */
                     if (i == value.length - 1) {
                         if (null != defaultExtName) {
+                            /**
+                             * value[i]的值不等于"protocol"
+                             */
                             if (!"protocol".equals(value[i]))
                                 if (hasInvocation)
                                     getNameCode = String.format("url.getMethodParameter(methodName, \"%s\", \"%s\")", value[i], defaultExtName);
@@ -1242,6 +1454,9 @@ public class ExtensionLoader<T> {
                             else
                                 getNameCode = String.format("( url.getProtocol() == null ? \"%s\" : url.getProtocol() )", defaultExtName);
                         } else {
+                            /**
+                             * 如果defaultExtName 不存在，spi注解中的value不存在
+                             */
                             if (!"protocol".equals(value[i]))
                                 if (hasInvocation)
                                     getNameCode = String.format("url.getMethodParameter(methodName, \"%s\", \"%s\")", value[i], defaultExtName);
